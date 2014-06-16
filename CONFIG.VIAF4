@@ -1,0 +1,388 @@
+<!-- ******************************************************************* -->
+<!-- ************************* BIBFILE ********************************* -->
+<!-- *********************** DEFINITIONS ******************************* -->
+<!-- ******************************************************************* -->
+<DBCONFIG>
+<DBENV>/home/rlarson/DBENV_V4</DBENV>
+<!-- The Main bibliographic file -->
+<FILEDEF TYPE=SGML>
+<DEFAULTPATH> /home/rlarson/DATA </DEFAULTPATH>
+
+
+<!-- filetag is the "shorthand" name of the file -->
+<FILETAG>viaf</FILETAG>
+
+
+<!-- filename is the full path name of the file -->
+<FILENAME>VIAF/data4</FILENAME>
+
+<CONTINCLUDE> VIAF/data4.cont </CONTINCLUDE>
+
+<!-- fileDTD is the full path name of the file's DTD -->
+<FILEDTD> /home/rlarson/Cheshire_Config/viaf.dtd </FILEDTD>
+
+
+<!-- assocfil is the full path name of the file's Associator -->
+<ASSOCFIL> VIAF/data4.assoc </ASSOCFIL>
+
+
+<!-- The following are the index definitions for the file -->
+
+<INDEXES>
+
+<!-- ******************************************************************************* -->
+<!-- ************************* ID numbers as in DNB, LC and BNF ************************** -->
+<!-- ******************************************************************************* -->
+
+<INDEXDEF ACCESS=BTREE EXTRACT=KEYWORD NORMAL=NONE>
+<INDXNAME>
+	indexes/viaf4_id.index
+</INDXNAME>
+<INDXTAG> idnumber </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>sources</FTAG><s>source</s>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+
+<!-- ******************************************************************** -->
+<!-- ************************* viafID numbers  ************************** -->
+<!-- ******************************************************************** -->
+
+<INDEXDEF ACCESS=BTREE EXTRACT=KEYWORD NORMAL=NONE>
+<INDXNAME>
+	indexes/viaf4_viafid.index
+</INDXNAME>
+<INDXTAG> viafid </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>viafID</FTAG>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+
+<!-- ******************************************************************************* -->
+<!-- ************************* NAME as in DNB, LC and BNF ************************** -->
+<!-- ******************************************************************************* -->
+
+<INDEXDEF ACCESS=BTREE EXTRACT=EXACTKEY NORMAL=NONE>
+<INDXNAME>
+	indexes/viaf4_xmainname.index
+</INDXNAME>
+<INDXTAG> xmainname </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>mainHeadings</FTAG><s>data<s>text</s></s>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+<INDEXDEF ACCESS=BTREE EXTRACT=KEYWORD NORMAL=NONE>
+<INDXNAME>
+	indexes/viaf4_mainname.index
+</INDXNAME>
+<INDXTAG> mainname </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>mainHeadings</FTAG><s>data<s>text</s></s>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+
+<INDEXDEF ACCESS=BTREE EXTRACT=KEYWORD NORMAL=NONE>
+<INDXNAME>
+	indexes/viaf4_seerefs.index
+</INDXNAME>
+<INDXTAG> seerefs </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>x400</FTAG><s>datafield</s>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+
+
+<INDEXDEF ACCESS=BTREE EXTRACT=KEYWORD NORMAL=NONE>
+<INDXNAME>
+	indexes/viaf4_seealso.index
+</INDXNAME>
+<INDXTAG> seealso </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>x500</FTAG><s>datafield</s>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+
+<INDEXDEF ACCESS=BTREE EXTRACT=KEYWORD NORMAL=NONE>
+<INDXNAME>
+	indexes/viaf4_birth.index
+</INDXNAME>
+<INDXTAG> birthdate </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>birthDate</FTAG>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+<INDEXDEF ACCESS=BTREE EXTRACT=KEYWORD NORMAL=NONE>
+<INDXNAME>
+	indexes/viaf4_death.index
+</INDXNAME>
+<INDXTAG> deathdate </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>deathDate</FTAG>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+
+<INDEXDEF ACCESS=BTREE EXTRACT=EXACTKEY NORMAL=DO_NOT_NORMALIZE>
+<INDXNAME>
+	indexes/viaf4_xmainname_nonorm.index
+</INDXNAME>
+<INDXTAG> xmainnamenn </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>mainHeadings</FTAG><s>data<s>text</s></s>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+<INDEXDEF ACCESS=BTREE EXTRACT=KEYWORD NORMAL=DO_NOT_NORMALIZE>
+<INDXNAME>
+	indexes/viaf4_mainname_nonorm.index
+</INDXNAME>
+<INDXTAG> mainnamenn </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>mainHeadings</FTAG><s>data<s>text</s></s>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+
+<INDEXDEF ACCESS=BTREE EXTRACT=EXACTKEY NORMAL=NONE>
+<INDXNAME>
+	indexes/viaf4_xallnames.index
+</INDXNAME>
+<INDXTAG> xallnames </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>mainHeadings</FTAG><s>data<s>text</s></s>
+	<FTAG>x400</FTAG><s>datafield</s>
+	<FTAG>x500</FTAG><s>datafield</s>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+<INDEXDEF ACCESS=BTREE EXTRACT=KEYWORD NORMAL=NONE>
+<INDXNAME>
+	indexes/viaf4_allnames.index
+</INDXNAME>
+<INDXTAG> allnames </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>mainHeadings</FTAG><s>data<s>text</s></s>
+	<FTAG>x400</FTAG><s>datafield</s>
+	<FTAG>x500</FTAG><s>datafield</s>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+
+<INDEXDEF ACCESS=BTREE EXTRACT=NGRAMS NORMAL=NONE>
+<INDXNAME>
+	indexes/viaf4_allnamesngram.index
+</INDXNAME>
+<INDXTAG> allnamesngram </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>mainHeadings</FTAG><s>data<s>text</s></s>
+	<FTAG>x400</FTAG><s>datafield</s>
+	<FTAG>x500</FTAG><s>datafield</s>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+<!-- ******************************************************************************* -->
+<!-- ************************* NGRAMS for NAME as in DNB, LC and BNF  ************* -->
+<!-- ******************************************************************************* -->
+
+<INDEXDEF ACCESS=BTREE EXTRACT=NGRAMS NORMAL=BASIC>
+<INDXNAME>
+	indexes/viaf4_mainnamengram.index
+</INDXNAME>
+<INDXTAG> mainnamengram </INDXTAG>
+
+<!-- The stoplist for this file -->
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be extracted and indexed for this index    -->
+<INDXKEY>
+<TAGSPEC>
+	<FTAG>mainHeadings</FTAG><s>data<s>text</s></s>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+
+<!-- Bitmapped index of types for authority records -->
+<INDEXDEF ACCESS=BITMAPPED EXTRACT=EXACTKEY NORMAL=BASIC_NOMAP>
+<INDXNAME> indexes/viaf4_nametype.index
+</INDXNAME>
+<INDXTAG> nametype </INDXTAG>
+<INDXKEY>
+<TAGSPEC>
+<FTAG> nameType </FTAG> 
+</TAGSPEC> 
+</INDXKEY> 
+</INDEXDEF>
+
+<!-- ******************************************************************* -->
+<!-- *************** bitmap coded index for Spirits   ********** -->
+<!-- ******************************************************************* -->
+<INDEXDEF ACCESS=BITMAPPED EXTRACT=CODED NORMAL=BASIC>
+<INDXNAME>
+indexes/viaf4_spirit.index
+</INDXNAME>
+<INDXTAG> spirit </INDXTAG>
+
+<!-- The INDXKEY area contains the specifications of tags in the doc -->
+<!-- that are to be indexed (as to existence) for this index    -->
+<INDXKEY>
+<TAGSPEC>
+        <FTAG>mainHeadings</FTAG><s>data<s>text<value>Spirit</value></s></s>
+</TAGSPEC>
+</INDXKEY>
+</INDEXDEF>
+
+
+</INDEXES>
+
+
+<DISPOPTIONS> KEEP_ENTITIES </DISPOPTIONS>
+
+<DISPLAY>
+
+<FORMAT name="XML_ELEMENT_" OID="1.2.840.10003.5.109.10">
+  <convert function="XML_ELEMENT">
+    <clusmap>
+      <from>
+         <tagspec>
+           <ftag>SUBST_ELEMENT</ftag>
+         </tagspec>
+       </from>
+       <to>
+         <tagspec>
+           <ftag>SUBST_ELEMENT</ftag>
+         </tagspec>
+       </to>
+      <from>
+         <tagspec>
+           <ftag>#RAWSCORE#</ftag>
+         </tagspec>
+       </from>
+       <to>
+         <tagspec>
+           <ftag>SCORE</ftag>
+         </tagspec>
+       </to>
+
+      <from>
+         <tagspec>
+           <ftag>#RANK#</ftag>
+         </tagspec>
+       </from>
+       <to>
+         <tagspec>
+           <ftag>RANK</ftag>
+         </tagspec>
+       </to>
+
+     </clusmap>
+   </convert>
+ </FORMAT>
+
+</DISPLAY>
+
+</FILEDEF>
+
+</DBCONFIG>
+
+
+
+
