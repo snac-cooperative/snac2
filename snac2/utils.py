@@ -61,6 +61,12 @@ def strip_accents(s):
         s = s.decode('utf-8')
     return ''.join((c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn' ))
    
+def strip_corp_abbrevs(s):
+    stoplist = set(["co", "corp", "llc", "lp", "llp", "pllc", "inc", "pc", "dba", "gp", "cic", "cio", "ltd", "plc", "eg", "ag", "sa", "sas", "ptp"])
+    name_norm = s.split(" ")
+    name_norm = " ".join([token for token in name_norm if token not in stoplist])
+    return name_norm
+    
 def compress_spaces(s):
     return ' '.join(s.split())
    

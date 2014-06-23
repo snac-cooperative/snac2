@@ -270,18 +270,28 @@ def getMainHeadingEl2(doc):
             mainHeadings.append(data)
     return mainHeadings
 
+def config_cheshire(config_path=None, db="viaf"):
+    if not config_path:
+        import snac2.config.app as app
+        config_path = app.VIAF_CONFIG
+        if not config_path:
+            raise ValueError("Must have a Cheshire config_path")
+    cheshire.init(config_path)
+    cheshire.setdb(db)
+    return 
+
 def query_cheshire_viaf(name, name_type=None, index="mainnamengram", config_path=None, db='viaf', limit=10):
     r = None
     try:
     
-        if not config_path:
-            import snac2.config.app as app
-            config_path = app.VIAF_CONFIG
-        if not config_path:
-            raise ValueError("Must have a Cheshire config_path")
-        cheshire.init(config_path)
-
-        cheshire.setdb(db)
+#         if not config_path:
+#             import snac2.config.app as app
+#             config_path = app.VIAF_CONFIG
+#         if not config_path:
+#             raise ValueError("Must have a Cheshire config_path")
+#         cheshire.init(config_path)
+# 
+#         cheshire.setdb(db)
         if name_type == "person":
             name_type = "personal"
         elif name_type == "corporateBody":
@@ -300,7 +310,7 @@ def query_cheshire_viaf(name, name_type=None, index="mainnamengram", config_path
             n = limit
         while i < n:
             rec = cheshire.getrecord(r,i)
-            #rel = cheshire.getrelevance(r,i)
+            rel = cheshire.getrelevance(r,i)
             records.append(rec)
             i += 1
         #n = cheshire.getnumfound(r)
@@ -327,7 +337,7 @@ def query_cheshire_viaf(name, name_type=None, index="mainnamengram", config_path
 
 def get_viaf_records(name, index="mainnamengram", name_type=None):
     results = query_cheshire_viaf(name=name, index=index, name_type=name_type)
-    results = [getEntityInformation(r) for r in results]
+    #results = [getEntityInformation(r) for r in results]
     return results
     
 if __name__ == "__main__":

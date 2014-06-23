@@ -11,6 +11,7 @@ import nameparser
 
 STR_FUZZY_MATCH_THRESHOLD  = 0.85
 ACCEPT_THRESHOLD = 0.9
+CORP_ACCEPT_THRESHOLD = 0.95
 POSTGRES_NGRAM_THRESHOLD = 0.75
 
 logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d %I:%M:%S %p', level=logging.INFO)
@@ -196,11 +197,12 @@ def match_exact(record, record_type):
         if quality_date_from != 0 and quality_date_to != 0:
             return record_group, record_group.viaf_id, record_group.viaf_record, 1
     viaf_records = viaf.get_viaf_records(record.name_norm, index="xmainname[5=100]", name_type=record_type)
-    viafInfo = viaf.getEntityInformation(viaf_record)
-    viaf_id = viafInfo['recordId']
-    match = 1
-    authority_dates = viafInfo.get('dates')
-    if viaf_id:
+    if viaf_records:
+        viaf_record = viaf_records[0]
+        viafInfo = viaf.getEntityInformation(viaf_record)
+        viaf_id = viafInfo['recordId']
+        match = 1
+        authority_dates = viafInfo.get('dates')
         quality_date_from = -1
         quality_date_to = -1
         if authority_dates:
@@ -214,20 +216,15 @@ def match_exact(record, record_type):
                     logging.info("No record_group created yet for %s using viaf %s" % (record.name_norm, viaf_id))
             else:
                 logging.info("existence date mismatch for %s using viaf %s: %d %d" % (record.name_norm, viaf_id, quality_date_from, quality_date_to))
-                viaf_id = None,
-                record_group = None
-                viaf_record = None
-                match = 0
+                return None, None, None, 0
         else:
             logging.info("Failed viaf record date check %s using viaf %s" % (record.name_norm, viaf_id))
-            viaf_id = None,
-            record_group = None
-            viaf_record = None
-            match = 0
+            return None, None, None, 0
+        return record_group, viaf_id, viaf_record, match
     else:
         logging.info("No viaf for %d %s" % (record.id, record.name_norm))
+        return None, None, None, 0
         
-    return record_group, viaf_id, viaf_record, match
     
 def match_person_exact(record):
     record_group = models.PersonGroup.get_by_name(record.name_norm)
@@ -238,37 +235,33 @@ def match_person_exact(record):
     viaf_record = None
     if viaf_records:
         viaf_record = viaf_records[0]
-    viafInfo = viaf.getEntityInformation(viaf_record)
-    viaf_id = viafInfo['recordId']
-    match = 1
-    authority_dates = viafInfo.get('dates')
-    if viaf_id:
-        quality_date_from = -1
-        quality_date_to = -1
-        if authority_dates:
-            quality_date_from, quality_date_to = check_existence_dates(record, authority_dates)
-            if quality_date_from != 0 and quality_date_to != 0:
-                logging.info("Found viaf %s for %d %s" % (viaf_id, record.id, record.name_norm))
-                record_group = models.PersonGroup.get_by_viaf_id(viaf_id)
-                if record_group:
-                    logging.info("Found record_group id %d for %s using viaf %s" % (record_group.id, record.name_norm, viaf_id))
+        viafInfo = viaf.getEntityInformation(viaf_record)
+        viaf_id = viafInfo['recordId']
+        match = 1
+        authority_dates = viafInfo.get('dates')
+        if viaf_id:
+            quality_date_from = -1
+            quality_date_to = -1
+            if authority_dates:
+                quality_date_from, quality_date_to = check_existence_dates(record, authority_dates)
+                if quality_date_from != 0 and quality_date_to != 0:
+                    logging.info("Found viaf %s for %d %s" % (viaf_id, record.id, record.name_norm))
+                    record_group = models.PersonGroup.get_by_viaf_id(viaf_id)
+                    if record_group:
+                        logging.info("Found record_group id %d for %s using viaf %s" % (record_group.id, record.name_norm, viaf_id))
+                    else:
+                        logging.info("No record_group created yet for %s using viaf %s" % (record.name_norm, viaf_id))
                 else:
-                    logging.info("No record_group created yet for %s using viaf %s" % (record.name_norm, viaf_id))
+                    logging.info("existence date mismatch for %s using viaf %s: %d %d" % (record.name_norm, viaf_id, quality_date_from, quality_date_to))
+                    return None, None, None, 0
             else:
-                logging.info("existence date mismatch for %s using viaf %s: %d %d" % (record.name_norm, viaf_id, quality_date_from, quality_date_to))
-                viaf_id = None,
-                record_group = None
-                viaf_record = None
-                match = 0
+                logging.info("Failed viaf record date check %s using viaf %s" % (record.name_norm, viaf_id))
+                return None, None, None, 0
         else:
-            logging.info("Failed viaf record date check %s using viaf %s" % (record.name_norm, viaf_id))
-            viaf_id = None,
-            record_group = None
-            viaf_record = None
-            match = 0
+            logging.info("No viaf for %d %s" % (record.id, record.name_norm))
+        return record_group, viaf_id, viaf_record, match
     else:
-        logging.info("No viaf for %d %s" % (record.id, record.name_norm))
-    return record_group, viaf_id, viaf_record, match
+        return None, None, None, 0
 
 def match_person_ngram_viaf(record):
     match, match_quality = viaf_match_ngram(record)
@@ -371,6 +364,7 @@ def match_person_ngram_postgres(record):
 def viaf_match_ngram(record):
     '''accepts a Record as input, and returns a VIAF record matching the given record and a quality value between 0 and 1'''
     viaf_matches = viaf.get_viaf_records(record.name_norm, index="mainnamengram", name_type="person")
+    viaf_matches = [viaf.getEntityInformation(r) for r in viaf_matches]
     #possible_matches = []
     if viaf_matches:
         viaf_matches = viaf_matches[:10]
@@ -454,6 +448,16 @@ def match_corporate(batch_size=1000):
     records = models.CorporateOriginalRecord.get_all_unprocessed_records(limit=batch_size)
     for record in records:
         record_group, viaf_id, viaf_record, match_quality = match_exact(record, record_type="corporate")
+        maybe_viaf_id = None
+        if not record_group and not viaf_id:
+            record_group, viaf_id, viaf_record, match_quality = match_corp_keyword_viaf(record)
+            if match_quality >= CORP_ACCEPT_THRESHOLD:
+                logging.info("accepted: %s" % (viaf_id))
+            elif match_quality >= STR_FUZZY_MATCH_THRESHOLD:
+                maybe_viaf_id = viaf_id
+                viaf_id = record_group = viaf_record = None
+                logging.info("maybe: %s" % (maybe_viaf_id))
+                
         if not record_group:
             record_group = models.CorporateGroup(name=record.name_norm)
             record_group.save()
@@ -473,13 +477,46 @@ def match_corporate(batch_size=1000):
                 record_group.viaf_record = viaf_record
         else:
             logging.info("Already a viaf for %d %s; not attempting again" % (record.id, record.name_norm))
+        if maybe_viaf_id:
+            candidate = models.MaybeCandidate(candidate_type="viaf", candidate_id=maybe_viaf_id, record_group_id=record_group.id)
+            candidate.save()
+            maybe_viaf_id = None
+            logging.info("Set %s as maybe for record_group %d" % (maybe_viaf_id, record_group.id))
         record.processed = True
         models.commit()
     return len(records)
-        
+    
+def viaf_match_keyword(record, name_type="person"):
+    name_norm = record.name_norm
+    if name_type == "corporate":
+        name_norm = utils.strip_corp_abbrevs(utils.strip_accents(utils.normalize_name_without_punc_with_space(name_norm)))
+    logging.info("keyword matching on %d %s" % (record.id, name_norm))
+    viaf_matches = viaf.get_viaf_records(name_norm, index="mainname", name_type=name_type)
+    viaf_matches = [viaf.getEntityInformation(r) for r in viaf_matches]
+    for m in viaf_matches:
+        candidate_name = utils.strip_corp_abbrevs(utils.strip_accents(utils.normalize_name_without_punc_with_space(m['mainHeadings'][0])))
+        length = utils.computeJaroWinklerDistance(name_norm, candidate_name)
+        if length >= STR_FUZZY_MATCH_THRESHOLD:
+            logging.info("accepted as yes or maybe: %s for %s at %0.4f" % (name_norm, candidate_name, length))
+            return m, length
+    return viaf.VIAF.get_empty_viaf_dict(), 0 
+
+def match_corp_keyword_viaf(record):
+    match, match_quality = viaf_match_keyword(record, name_type="corporate")
+    if match_quality > 0:
+        record_group = models.RecordGroup.get_by_viaf_id(match['recordId'])
+        return record_group, match['recordId'], match['_raw'], match_quality
+    else:
+        return None, None, None, -1
+
 if __name__ == "__main__":
     db_uri = db_config.get_db_uri()
     models.init_model(db_uri)
-    match_persons_loop()
-    match_corporate_loop()
-    match_families_loop()
+    viaf.config_cheshire(db="viaf")
+    import sys
+    if "person" in sys.argv[1:]:
+        match_persons_loop()
+    if "corporate" in sys.argv[1:]:
+        match_corporate_loop()
+    if "family" in sys.argv[1:]:
+        match_families_loop()

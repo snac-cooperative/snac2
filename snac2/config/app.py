@@ -3,8 +3,6 @@ DEBUG_ECHO = False
 """
 Paths to binaries (if not on path)
 """
-#WebCheshire
-webcheshire = '/usr/local/bin/webcheshire'
 
 VIAF_CONFIG = "/lv1/home/rlarson/Cheshire_Config/CONFIG.VIAF4"
 
@@ -45,8 +43,3 @@ viaf = '/db/projects/lcshrecommend/catalogs/SNAC/VIAF/data/'
 
 #Path to the directory where the merged records are created (Create directory)
 merged = '/projects/snac-output/test100k0'
-
-
-RESULT_SCRIPT_DEFAULT = "/projects/snac2/test_viaf_simple.tcl"
-RESULT_SCRIPT_MORE = "/projects/snac2/testit_viaf_moreresults.tcl"
-
