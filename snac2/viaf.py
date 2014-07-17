@@ -5,7 +5,6 @@ import sys
 import re
 import commands
 import logging
-import Tkinter
 import CheshirePy as cheshire
 
 import lxml.etree as etree
