@@ -246,66 +246,66 @@ def createCombinedRecord(cpfRecords, viafInfo, dbpediaInfo=None, r_type="", cano
     # TODO: patch in the new branch; this one's pretty dead
     
    #  #VIAF Mainheadings
-#     viaf_name_nodes = viafInfo['mainHeadingsData']
-#     viaf_names = []
-#     viaf_name_index = {}
-#     LOC_name = []
-#     for nameEntry in viaf_name_nodes:
-#         text_nodes =  nameEntry.getElementsByTagName("text")
-#         source_nodes = nameEntry.getElementsByTagName("s")
-#         name = ""
-#         authorized_form = ""
-#         
-#         if text_nodes:
-#             name = text_nodes[0].firstChild.nodeValue
-#             if source_nodes:
-#                 for source_node in source_nodes:
-#                     source = source_node.firstChild.nodeValue
-#                     if source and source.strip() == "LC":
-#                         authorized_form = "LoC"
-#                         LOC_name = (name, authorized_form)
-#                         break
-#         if not authorized_form:
-#             authorized_form = "VIAF"
-#         if name in viaf_name_index:
-#             pass
-#         else:
-#             viaf_name_index[name] = 1
-#             if authorized_form != "LoC":
-#                 viaf_names.append((name, authorized_form))
-#     if LOC_name:
-#         viaf_names = [LOC_name] + viaf_names
-#     for name in viaf_names:
-#         cr.write('<nameEntry localType="http://viaf.org/viaf/terms#mainHeadings/data/text">')
-#         cr.write('<part>')
-#         cr.write(escape(name[0]).encode('utf-8'))
-#         cr.write('</part>')
-#         if (name[1] == "LoC"):
-#             cr.write('<authorizedForm>LoC</authorizedForm>')
-#         else:
-#             cr.write('<alternativeForm>VIAF</alternativeForm>')
-#         cr.write('</nameEntry>')
-#     for name in mnames:
-#         cr.write(name.toxml().encode('utf-8'))
+    viaf_name_nodes = viafInfo['mainHeadingsData']
+    viaf_names = []
+    viaf_name_index = {}
+    LOC_name = []
+    for nameEntry in viaf_name_nodes:
+        text_nodes =  nameEntry.getElementsByTagName("text")
+        source_nodes = nameEntry.getElementsByTagName("s")
+        name = ""
+        authorized_form = ""
+        
+        if text_nodes:
+            name = text_nodes[0].firstChild.nodeValue
+            if source_nodes:
+                for source_node in source_nodes:
+                    source = source_node.firstChild.nodeValue
+                    if source and source.strip() == "LC":
+                        authorized_form = "LoC"
+                        LOC_name = (name, authorized_form)
+                        break
+        if not authorized_form:
+            authorized_form = "VIAF"
+        if name in viaf_name_index:
+            pass
+        else:
+            viaf_name_index[name] = 1
+            if authorized_form != "LoC":
+                viaf_names.append((name, authorized_form))
+    if LOC_name:
+        viaf_names = [LOC_name] + viaf_names
+    for name in viaf_names:
+        cr.write('<nameEntry localType="http://viaf.org/viaf/terms#mainHeadings/data/text">')
+        cr.write('<part>')
+        cr.write(escape(name[0]).encode('utf-8'))
+        cr.write('</part>')
+        if (name[1] == "LoC"):
+            cr.write('<authorizedForm>LoC</authorizedForm>')
+        else:
+            cr.write('<alternativeForm>VIAF</alternativeForm>')
+        cr.write('</nameEntry>')
+    for name in mnames:
+        cr.write(name.toxml().encode('utf-8'))
         
         
  #    #VIAF X400s 
-# #     for nameEntry in set(viafInfo['x400s']) :
-# #         cr.write('<nameEntry localType="http://viaf.org/viaf/terms#x400s/400">')
-# #         cr.write('<part localType="http://viaf.org/viaf/terms#x400s/400/a">')
-# #         cr.write(escape(nameEntry).encode('utf-8'))
-# #         cr.write('</part>')
-# #         cr.write('<alternativeForm>VIAF</alternativeForm>')
-# #         cr.write('</nameEntry>')
-
-#     for x400 in viafInfo['x400s'] :
-#         cr.write('<nameEntry localType="http://viaf.org/viaf/terms#x400s/%s">' % (x400['tag']))
-#         for subfield in x400['subfields']:
-#             cr.write('<part localType="http://viaf.org/viaf/terms#x400s/%s/%s">' % (x400['tag'], subfield['code']))
-#             cr.write(escape(subfield['value']).encode('utf-8'))
-#             cr.write('</part>')
+#     for nameEntry in set(viafInfo['x400s']) :
+#         cr.write('<nameEntry localType="http://viaf.org/viaf/terms#x400s/400">')
+#         cr.write('<part localType="http://viaf.org/viaf/terms#x400s/400/a">')
+#         cr.write(escape(nameEntry).encode('utf-8'))
+#         cr.write('</part>')
 #         cr.write('<alternativeForm>VIAF</alternativeForm>')
 #         cr.write('</nameEntry>')
+
+    for x400 in viafInfo['x400s'] :
+        cr.write('<nameEntry localType="http://viaf.org/viaf/terms#x400s/%s">' % (x400['tag']))
+        for subfield in x400['subfields']:
+            cr.write('<part localType="http://viaf.org/viaf/terms#x400s/%s/%s">' % (x400['tag'], subfield['code']))
+            cr.write(escape(subfield['value']).encode('utf-8'))
+            cr.write('</part>')
+        cr.write('<alternativeForm>VIAF</alternativeForm>')
+        cr.write('</nameEntry>')
         
     #END identity   
     cr.write("</identity>")

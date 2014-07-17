@@ -1,9 +1,5 @@
 DEBUG_ECHO = False
 
-"""
-Paths to binaries (if not on path)
-"""
-
 VIAF_CONFIG = "/lv1/home/rlarson/Cheshire_Config/CONFIG.VIAF4"
 
 """
@@ -11,9 +7,6 @@ VIAF_CONFIG = "/lv1/home/rlarson/Cheshire_Config/CONFIG.VIAF4"
 """
 #Log
 log = 'logs/snac.log_20120625.1'
-
-#Entity type to merge
-#entityType = 'person' #person, family, corporateBody
 
 #Library of congress
 loc = '/projects/snac-data/loc'
