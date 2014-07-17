@@ -271,11 +271,15 @@ class OriginalRecord(meta.Base, Entity):
         return record_class(name=names[0], name_norm=utils.normalize_with_space(names[0]), source_id=entityId, from_date=fromDate, from_date_type=from_date_type, to_date=toDate, to_date_type=to_date_type, record_data=eac_text)
 
     @classmethod
-    def get_all_unprocessed_records(cls, options=None, session=None, limit=None):
+    def get_all_unprocessed_records(cls, options=None, session=None, limit=None, min_id=None, max_id=None):
         if not session:
             session = meta.Session
         q = session.query(cls)
         q = q.filter(cls.processed==False)
+        if min_id:
+            q = q.filter(cls.id>=min_id)
+        if max_id:
+            q = q.filter(cls.id<=max_id)
         if options:
             q = q.options(*options)
         q = q.order_by(cls.id.asc())
@@ -426,12 +430,34 @@ class RecordGroup(meta.Base, Entity):
             return snac2.viaf.getEntityInformation(self.viaf_record)
 
     @classmethod
-    def get_all_with_no_merge_record(cls, session=None, limit=None, offset=None):
+    def get_all_with_no_merge_record(cls, session=None, limit=None, offset=None, name_type=None):
         if not session:
             session = meta.Session
         q = session.query(cls)
         q = q.outerjoin(cls.merge_records)
         q = q.filter(MergedRecord.record_group_id==None)
+        if name_type:
+            q = q.filter(cls.g_type == name_type)
+        q = q.order_by(cls.id.asc())
+        if limit:
+            q = q.limit(limit)
+        if offset:
+            q = q.offset(offset)
+        return q.all()
+        
+    @classmethod
+    def get_all_by_type(cls, session=None, limit=None, offset=None, name_type=None, exclude_non_viaf=False, start_at_id=None, end_at_id=None):
+        if not session:
+            session = meta.Session
+        q = session.query(cls)
+        if name_type:
+            q = q.filter(cls.g_type == name_type)
+        if exclude_non_viaf:
+            q = q.filter(cls.viaf_id != None)
+        if start_at_id:
+            q = q.filter(cls.id >= start_at_id)
+        if end_at_id:
+            q = q.filter(cls.id <= end_at_id)
         q = q.order_by(cls.id.asc())
         if limit:
             q = q.limit(limit)
@@ -451,12 +477,16 @@ class CorporateGroup(RecordGroup):
 class FamilyGroup(RecordGroup):
     __mapper_args__ = {'polymorphic_identity': RECORD_TYPE_FAMILY}
     __basic_attrs__ = ['id', 'name', 'viaf_id', 'created_at', 'updated_at']
+    
+class InvalidGroup(RecordGroup):
+    __mapper_args__ = {'polymorphic_identity': "invalid"}
+    __basic_attrs__ = ['id', 'name', 'viaf_id', 'created_at', 'updated_at']
 
 class MergedRecord(meta.Base, Entity):
     __tablename__ = 'merged_records'
     id = Column(types.BigInteger, primary_key=True)
     canonical_id = Column(types.Unicode(1024), nullable=True, index=True, unique=True)
-    name = Column(types.Unicode(255), nullable=False, index=True, server_default=u'')
+    name = Column(types.Unicode(1024), nullable=False, index=True, server_default=u'')
     r_type = Column(types.Unicode(64), nullable=False, index=True)
     from_date = Column(Date(), nullable=True)
     to_date = Column(Date(), nullable=True)

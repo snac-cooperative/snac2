@@ -88,10 +88,10 @@ def parseIdentityRaw(doc):
         return None
 
 #Parse exist dates
-def parseExistDates(eac):
+def parseExistDates(doc):
     
     try:
-        doc = xml.dom.minidom.parseString(open(eac).read())
+        #doc = xml.dom.minidom.parseString(open(eac).read())
         existDates = doc.getElementsByTagName("existDates")
         return existDates
     except:
@@ -128,10 +128,10 @@ def parseLocalDescriptions(doc):
        logging.info("ERROR: Unable to extract local descriptions from %s" %eac)
 
 #Parse sources
-def parseSources(eac):
+def parseSources(doc):
     
     try:
-        doc = xml.dom.minidom.parse(eac)
+        #doc = xml.dom.minidom.parse(eac)
         sources = doc.getElementsByTagName("sources")
         if len(sources) > 0:
             return sources[0].childNodes
@@ -144,11 +144,10 @@ def parseSources(eac):
         logging.info("ERROR: Unable to extract sources from %s" %eac)
 
 #Parse associations for a eac record, return the raw xml
-def parseAssociationsRaw(eac):
+def parseAssociationsRaw(doc):
     
     try:
-        
-        doc = xml.dom.minidom.parseString(open(eac).read().replace('localType="recordId"', 'localType="http://socialarchive.iath.virginia.edu/control/term#ExtractedRecordId"').replace("http://RDVocab.info/uri/schema/FRBRentitiesRDA/", "http://socialarchive.iath.virginia.edu/control/term#"))
+        #doc = xml.dom.minidom.parseString(open(eac).read())
         relation = doc.getElementsByTagName("relations")
         if len(relation) >0 :
             cpfRelations = relation[0].getElementsByTagName("cpfRelation")
@@ -161,10 +160,10 @@ def parseAssociationsRaw(eac):
      
 
 #Parse resource associations for a eac record, return the raw xml
-def parseResourceAssociationsRaw(eac):
+def parseResourceAssociationsRaw(doc):
     
     try:
-        doc = xml.dom.minidom.parseString(open(eac).read().replace('localType="Leader', 'localType="http://socialarchive.iath.virginia.edu/control/term#Leader'))
+        #doc = xml.dom.minidom.parseString(open(eac).read().replace('localType="Leader', 'localType="http://socialarchive.iath.virginia.edu/control/term#Leader'))
         relation = doc.getElementsByTagName("relations")
         if len(relation) > 0:
             resourceRelations = relation[0].getElementsByTagName("resourceRelation")
@@ -177,12 +176,11 @@ def parseResourceAssociationsRaw(eac):
 
 
 #Parse the associations from a eac record
-def parseAssociations(eac):
+def parseAssociations(doc):
 
     try:
-        associations = {}
-        
-        doc = xml.dom.minidom.parseString(open(eac).read().replace('localType="recordId"', 'localType="http://socialarchive.iath.virginia.edu/control/term#ExtractedRecordId"').replace("http://RDVocab.info/uri/schema/FRBRentitiesRDA/", "http://socialarchive.iath.virginia.edu/control/term#"))
+        associations = {}   
+        #doc = xml.dom.minidom.parseString(open(eac).read().replace('localType="recordId"', 'localType="http://socialarchive.iath.virginia.edu/control/term#ExtractedRecordId"').replace("http://RDVocab.info/uri/schema/FRBRentitiesRDA/", "http://socialarchive.iath.virginia.edu/control/term#"))
         relation = doc.getElementsByTagName("relations")
         if len(relation) > 0:
             cpfRelations = relation[0].getElementsByTagName("cpfRelation")
@@ -201,9 +199,8 @@ def content(tag):
     return tag.text + ''.join(etree.tostring(e) for e in tag)
                                                
 #Parse the bioghist field from a eac record
-def parseBiogHist(eac):
-
-    doc = etree.XML(open(eac).read())
+def parseBiogHist(etree_doc):
+    doc = etree_doc
     doc = utils.strip_xml_ns(doc)
     bioghist = doc.xpath("//*[local-name() = 'biogHist']")
     if len(bioghist) > 0:
@@ -221,6 +218,14 @@ def parseBiogHist(eac):
         return biog_data
     else:
         return None
+        
+
+def parseFunctions(doc):
+    functions = doc.getElementsByTagName("function")
+    if len(functions) > 0:
+        return functions
+    else:
+        return []
 
 
 def pad_exist_date(date_string):

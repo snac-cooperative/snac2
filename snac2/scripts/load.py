@@ -32,8 +32,9 @@ def load_collection(collection_path):
                         logging.info("%s: %d completed" %(collection_path, n))
                 n += 1
         except Exception, e:
-            raise e
             logging.warning("%s: error parsing %s %s" %(collection_path, f, e))
+            raise e
+            
 
 if __name__ == "__main__":
     import sys

@@ -61,6 +61,7 @@ def getEntityInformation(viafRecord):
         info['language'] = getLanguageOfEntity(doc)
         info['nationality'] = getNationalityOfEntity(doc)
         info['mainElementEl'] = getMainHeadingEl2(doc2) # parsed element headings
+        info['sources'] = getSources(doc2)
         info['_raw'] = viafRecord
 #          except Exception, e:
 #              logging.info("ERROR: Could not parse VIAF file")
@@ -68,6 +69,8 @@ def getEntityInformation(viafRecord):
 #              print "Parse failure"
 
     return info
+
+
 
 def getMainHeadings(doc):
     try:
@@ -269,6 +272,13 @@ def getMainHeadingEl2(doc):
         if data:
             mainHeadings.append(data)
     return mainHeadings
+    
+def getSources(doc):
+    results = []
+    sources = doc.findall("viaf:sources/viaf:source", namespaces=NSMAP)
+    for source in sources:
+        results.append(source.text)
+    return results
 
 def config_cheshire(config_path=None, db="viaf"):
     if not config_path:
@@ -279,6 +289,30 @@ def config_cheshire(config_path=None, db="viaf"):
     cheshire.init(config_path)
     cheshire.setdb(db)
     return 
+    
+def query_cheshire_viaf_id(viaf_id, name_type="person", db="viaf", limit=1, index="viafid"):
+    record = None
+    try:
+        if name_type == "person":
+            name_type = "personal"
+        elif name_type == "corporateBody":
+            name_type = "corporate"
+        searchstr = "%s '%s'" % (index, viaf_id)
+        if name_type:
+            searchstr += " and nametype '%s'" % (name_type)
+        logging.info("searching for '%s'" % searchstr.encode('utf-8'))
+        r = cheshire.Search(searchstr.encode('utf-8'))
+        n = cheshire.getnumfound(r)
+        logging.info ("%d records found; limit set to %d" % (n, limit))
+        if n:
+            record = cheshire.getrecord(r,0)
+            rel = cheshire.getrelevance(r,0)
+    except Exception, e:
+        if r:
+            cheshire.closeresult(r)
+        raise e
+    return record
+        
 
 def query_cheshire_viaf(name, name_type=None, index="mainnamengram", config_path=None, db='viaf', limit=10):
     r = None

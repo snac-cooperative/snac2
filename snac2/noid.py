@@ -30,12 +30,17 @@ def mint_n(n, is_fake=True):
 def get_ark_id(is_fake=True):
     noid_response = mint_one(is_fake)
     if noid_response:
-        return ARK_BASE_URI + noid_response
+        return create_full_ark_id(noid_response)
     return ""
 
 def get_ark_ids(n, is_fake=True):
     ids = mint_n(n, is_fake=is_fake)
     if ids:
-        return [ARK_BASE_URI + identifier for identifier in ids]
+        return [create_full_ark_id(identifier) for identifier in ids]
     return ""
 
+def create_full_ark_id(identifier):
+    result = identifier
+    if not identifier.startswith(ARK_BASE_URI):
+        result = ARK_BASE_URI + identifier
+    return result

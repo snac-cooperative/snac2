@@ -16,10 +16,10 @@ POSTGRES_NGRAM_THRESHOLD = 0.75
 
 logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d %I:%M:%S %p', level=logging.INFO)
 
-def match_persons_loop():
+def match_persons_loop(starts_at=None, ends_at=None):
     unprocessed_records = True
     while unprocessed_records:
-        records = match_persons(100)
+        records = match_persons(100, starts_at=starts_at, ends_at=ends_at)
         if not records:
             unprocessed_records = False
         else:
@@ -43,8 +43,8 @@ def match_families_loop():
         else:
             logging.info("retrieving next batch...")
 
-def match_persons(batch_size=None):
-    records = models.PersonOriginalRecord.get_all_unprocessed_records(limit=batch_size)
+def match_persons(batch_size=None, starts_at=None, ends_at=None):
+    records = models.PersonOriginalRecord.get_all_unprocessed_records(limit=batch_size, min_id=starts_at, max_id=ends_at)
     for record in records:
         viaf_id = None
         viaf_record = None
@@ -75,7 +75,9 @@ def match_persons(batch_size=None):
                     logging.info("accepted: %s" % (viaf_id))
             elif match_quality == -1:
                 #no viaf match at all
-                candidate, match_quality = match_person_ngram_postgres(record)
+                candidate = None
+                match_quality = -1
+#                candidate, match_quality = match_person_ngram_postgres(record)
                 if not match_quality:
                     pass
                 elif match_quality == -1:
@@ -227,10 +229,22 @@ def match_exact(record, record_type):
         
     
 def match_person_exact(record):
+#     TODO: need an existence date check
     record_group = models.PersonGroup.get_by_name(record.name_norm)
-    if record_group and record_group.viaf_record:
-        return record_group, record_group.viaf_id, record_group.viaf_record, 1
-    print record.name_norm
+    if record_group:
+        quality_date_from = DATE_NO_DATA
+        quality_date_to = DATE_NO_DATA
+        for candidate in record_group.records:
+            date_from, date_to = check_existence_dates_with_datetime(record, candidate.to_date, candidate.from_date)
+            if date_from > quality_date_from:
+                quality_date_from = date_from
+            if date_to > quality_date_to:
+                quality_date_to = date_to
+        if len(record.name_norm) > 10 and (quality_date_from > DATE_MATCH_FAIL or quality_date_to > DATE_MATCH_FAIL):
+            logging.info("record_group %d found in database by name for record %d" % (record_group.id, record.id))
+            return record_group, record_group.viaf_id, record_group.viaf_record, 1
+        else:
+            logging.info("failed existence check record_group %d for record %d" % (record_group.id, record.id))
     viaf_records = viaf.query_cheshire_viaf(record.name_norm, name_type="person", index="xmainname[5=100]", limit=1)
     viaf_record = None
     if viaf_records:
@@ -276,6 +290,8 @@ def compute_name_match_quality(x, y):
     y = re.sub("([\(\[]).*?([\)\]])", "", y)
     x=utils.normalize_name_without_punc_with_space(x)
     y=utils.normalize_name_without_punc_with_space(y)
+    x = utils.strip_controls(x)
+    y = utils.strip_controls(y)
     length = utils.computeJaroWinklerDistance(x, y) # the basic score, without matching any name scrutiny tests
     match_name = nameparser.HumanName(x) # use the name parser to try to separate out components
     query_name = nameparser.HumanName(y)
@@ -284,11 +300,13 @@ def compute_name_match_quality(x, y):
         # if first names exist, make sure they match, then check middle names and/or initials if they exist
         if len(match_name.last) > 1:
             if match_name.last == query_name.last:
-                logging.info("name quality code executed for %s vs %s" % (x, y))
+                #logging.info("name quality code executed for %s vs %s" % (x, y))
                 if (len(match_name.first) > 1 and match_name.first == query_name.first):
                     # if we have more than just a first initial, they should match
                     if not match_name.middle or not query_name.middle:
                         # if one of them is missing a middle name, fail as maybe
+                        pass
+                    elif ((match_name.title.lower()=="mrs") or (query_name.title.lower()=="mrs") and match_name.title != query_name.title):
                         pass
                     elif len(match_name.middle) > 1 and len(query_name.middle) > 1:
                         # there is a middle name on both and both are not initials
@@ -321,7 +339,7 @@ def compute_name_match_quality(x, y):
         if match_name.first and match_name.first == query_name.first:
             return 1
     # default quality capped at ACCEPT_THRESHOLD; only a maybe if it got here
-    return ACCEPT_THRESHOLD if length >= ACCEPT_THRESHOLD else length
+    return ACCEPT_THRESHOLD-0.00001 if length >= ACCEPT_THRESHOLD else length
 
 
 def match_person_ngram_postgres(record):
@@ -378,9 +396,10 @@ def viaf_match_ngram(record):
                 if quality_to == DATE_MATCH_FAIL or quality_from == DATE_MATCH_FAIL:
                     logging.info("Failed ngram existence check")
                     continue
+                elif quality_to == DATE_MATCH_EXACT and quality_from == DATE_MATCH_EXACT and record.name.startswith(m['mainHeadings'][0][:5]):
+                    return m, 1
                 else:
                     logging.info("passed existence check %d %d" % (quality_from, quality_to))
-                
                 if record.r_type=="person":
                     x = utils.strip_accents(m['mainHeadings'][0])
                     y = utils.strip_accents(record.name)
@@ -480,8 +499,8 @@ def match_corporate(batch_size=1000):
         if maybe_viaf_id:
             candidate = models.MaybeCandidate(candidate_type="viaf", candidate_id=maybe_viaf_id, record_group_id=record_group.id)
             candidate.save()
-            maybe_viaf_id = None
             logging.info("Set %s as maybe for record_group %d" % (maybe_viaf_id, record_group.id))
+            maybe_viaf_id = None
         record.processed = True
         models.commit()
     return len(records)
@@ -514,9 +533,20 @@ if __name__ == "__main__":
     models.init_model(db_uri)
     viaf.config_cheshire(db="viaf")
     import sys
-    if "person" in sys.argv[1:]:
-        match_persons_loop()
-    if "corporate" in sys.argv[1:]:
+    import argparse
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-p", "--person", action="store_true", help="match persons")
+    group.add_argument("-c", "--corporate", action="store_true", help="match corporate entities")
+    group.add_argument("-f", "--family", action="store_true", help="match families")
+    parser.add_argument("-s", "--starts_at", help="start the match at this ID", type=int)
+    parser.add_argument("-e", "--ends_at", help="stop matching at this ID", type=int)
+    
+    args=parser.parse_args()
+    if args.person:
+        match_persons_loop(starts_at=args.starts_at, ends_at=args.ends_at)
+    if args.corporate:
         match_corporate_loop()
-    if "family" in sys.argv[1:]:
+    if args.family:
         match_families_loop()
+

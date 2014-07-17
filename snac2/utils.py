@@ -42,6 +42,9 @@ def prev_dir(name, nest_n=1):
     for n in range(0, nest_n):
         name = os.path.dirname(name)
     return name
+    
+def extract_year(s):
+    return re.findall("\d+", s)
 
 def str_clean_and_lowercase(s):
     """Lower case + strip end white characters"""
@@ -60,12 +63,26 @@ def strip_accents(s):
     if (isinstance(s, str)):
         s = s.decode('utf-8')
     return ''.join((c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn' ))
+
+all_chars = (unichr(i) for i in xrange(0x110000))
+control_chars = ''.join(c for c in all_chars if unicodedata.category(c) == 'Cc')
+# or equivalently and much more efficiently
+control_chars = ''.join(map(unichr, range(0,32) + range(127,160)))
+control_char_re = re.compile('[%s]' % re.escape(control_chars))
+def strip_controls(s):
+    return control_char_re.sub('', s)
    
 def strip_corp_abbrevs(s):
     stoplist = set(["co", "corp", "llc", "lp", "llp", "pllc", "inc", "pc", "dba", "gp", "cic", "cio", "ltd", "plc", "eg", "ag", "sa", "sas", "ptp"])
     name_norm = s.split(" ")
     name_norm = " ".join([token for token in name_norm if token not in stoplist])
     return name_norm
+    
+def filter_tokens(s, stoplist=["d", "b", "circa", "ca", "active", "approximately", "fl", "c", "approximate"]):
+    stoplist = set(stoplist)
+    tokens = s.split(" ")
+    tokens = [token for token in tokens if token not in stoplist]
+    return " ".join(tokens)
     
 def compress_spaces(s):
     return ' '.join(s.split())
