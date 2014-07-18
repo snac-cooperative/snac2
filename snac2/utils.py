@@ -64,8 +64,7 @@ def strip_accents(s):
         s = s.decode('utf-8')
     return ''.join((c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn' ))
 
-all_chars = (unichr(i) for i in xrange(0x10000))
-control_chars = ''.join(c for c in all_chars if unicodedata.category(c) == 'Cc')
+
 # or equivalently and much more efficiently
 control_chars = ''.join(map(unichr, range(0,32) + range(127,160)))
 control_char_re = re.compile('[%s]' % re.escape(control_chars))
