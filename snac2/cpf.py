@@ -13,79 +13,85 @@ import snac2.utils as utils
 
 
 def parseIdentity(doc):
-
-
-    #Get identity information
-    try:
-        
-        #doc = xml.dom.minidom.parse(eac)
-        
-        identityInformation = {}
-        
-        #Parse Entity id
-        idEntry = doc.getElementsByTagName("recordId")
+ 
+    identityInformation = {}
+    
+    #Parse Entity id
+    idEntry = doc.getElementsByTagName("recordId")
+    if idEntry:
         entityId = idEntry[0].childNodes[0].nodeValue
         identityInformation['id'] = entityId
-        
-        #Parse Identity Information
-        cpfDescription = doc.getElementsByTagName("cpfDescription")
-        identity = cpfDescription[0].getElementsByTagName("identity")
     
+    #Parse Identity Information
+    cpfDescription = doc.getElementsByTagName("cpfDescription")
+    if cpfDescription:
+        identity = cpfDescription[0].getElementsByTagName("identity")
         #Parse Entity name
         nameEntry = identity[0].getElementsByTagName("nameEntry")
         part = nameEntry[0].getElementsByTagName("part")
         entityName = part[0].childNodes[0].nodeValue
+        authorized_form = nameEntry[0].getElementsByTagName("authorizedForm")
+        alternative_form = nameEntry[0].getElementsByTagName("alternativeForm")
+        sources = []
+        n_type = None
+        if authorized_form:
+            sources.append(authorized_form[0].childNodes[0].nodeValue)
+            n_type = utils.NAME_ENTRY_AUTHORIZED
+        elif alternative_form:
+            sources.append(alternative_form[0].childNodes[0].nodeValue)
+            n_type = utils.NAME_ENTRY_ALTERNATIVE
+        sources = set(sources)
         identityInformation['name'] = entityName #common.normalizeName(entityName)
-        
+        identityInformation['name_entry'] = utils.NameEntry(name=entityName, sources=sources, n_type=n_type)
         #Parse Entity type
         entityType = identity[0].getElementsByTagName("entityType")
         entityType = entityType[0].childNodes[0].nodeValue
         identityInformation['type'] = entityType
-        
-        #Parse Agency
-        maintanenceEntry = doc.getElementsByTagName("maintenanceAgency")
-        agencyEntry = maintanenceEntry[0].getElementsByTagName("agencyCode")
-        agency = agencyEntry[0].childNodes[0].nodeValue
-        identityInformation['agency'] = agency
-                    
-        return identityInformation
-    except:
-        logging.info("ERROR: Unable to extract entity information from %s" %eac)
-        return None
-
-
-#Parse the entity field from a eac record
-def parseIdentityRaw(doc):
-
-
-    #Get identity information
-    try:
-        identityInformation = {}
-        
-        #Parse Entity id
-        idEntry = doc.getElementsByTagName("recordId")
-        entityId = idEntry[0].childNodes[0].nodeValue
-        identityInformation['id'] = entityId
-        
-        cpfDescription = doc.getElementsByTagName("cpfDescription")
-        identity = cpfDescription[0].getElementsByTagName("identity")
     
-        #Parse all Entity name entries, get raw xml preserve attributes
-        nameEntry = identity[0].getElementsByTagName("nameEntry")
-        identityInformation['name'] = nameEntry
-        part = nameEntry[0].getElementsByTagName("part")
-        entityName = part[0].childNodes[0].nodeValue
-        identityInformation['name_part'] = entityName
-        
-        #Parse Entity type
-        entityType = identity[0].getElementsByTagName("entityType")
-        entityType = entityType[0].childNodes[0].nodeValue
-        identityInformation['type'] = entityType
-                    
-        return identityInformation
-    except:
-        logging.info("ERROR: Unable to extract entity information from %s" %eac)
-        return None
+    #Parse Agency
+#     print "DOC,", doc.toxml()
+#     maintenanceEntry = doc.getElementsByTagName("maintenanceAgency")
+#     if maintenanceEntry:
+#         agencyEntry = maintenanceEntry[0].getElementsByTagName("agencyName")
+#         agency = agencyEntry[0].childNodes[0].nodeValue
+#         identityInformation['agency'] = agency
+                
+    return identityInformation
+# 
+# 
+# 
+# #Parse the entity field from a eac record
+# def parseIdentityRaw(doc):
+# 
+# 
+#     #Get identity information
+#     try:
+#         identityInformation = {}
+#         
+#         #Parse Entity id
+#         idEntry = doc.getElementsByTagName("recordId")
+#         entityId = idEntry[0].childNodes[0].nodeValue
+#         identityInformation['id'] = entityId
+#         
+#         cpfDescription = doc.getElementsByTagName("cpfDescription")
+#         identity = cpfDescription[0].getElementsByTagName("identity")
+#     
+#         #Parse all Entity name entries, get raw xml preserve attributes
+#         nameEntry = identity[0].getElementsByTagName("nameEntry")
+#         identityInformation['name'] = nameEntry
+#         part = nameEntry[0].getElementsByTagName("part")
+#         entityName = part[0].childNodes[0].nodeValue
+#         identityInformation['name_part'] = entityName
+#         
+#         #Parse Entity type
+#         entityType = identity[0].getElementsByTagName("entityType")
+#         entityType = entityType[0].childNodes[0].nodeValue
+#         identityInformation['type'] = entityType
+#                     
+#         return identityInformation
+#     except:
+#         logging.info("ERROR: Unable to extract entity information from %s" %eac)
+#         return None
 
 #Parse exist dates
 def parseExistDates(doc):
@@ -206,15 +212,20 @@ def parseBiogHist(etree_doc):
     if len(bioghist) > 0:
         b_node = bioghist[0]
         biog_data = {"raw":etree.tostring(b_node)}
+        citation = b_node.find("citation")
+        if citation is not None:
+            biog_data["citation"] = etree.tostring(citation)
+        if b_node.find("chronList") is not None:
+            biog_data["text"] = []
+            print "WARNING CHRONLIST DETECTED"
+            print etree.tostring(etree_doc)
+            return biog_data
         paragraphs = []
         p_nodes = b_node.findall('p')
         if p_nodes:
             for n in p_nodes:
                 paragraphs.append(etree.tostring(n))
             biog_data["text"] = paragraphs
-        citation = b_node.find("citation")
-        if citation is not None:
-            biog_data["citation"] = etree.tostring(citation)
         return biog_data
     else:
         return None

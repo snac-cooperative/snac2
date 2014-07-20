@@ -37,7 +37,78 @@ class URI(object):
     def __str__(self):
         return urlparse.urlunparse((self.scheme, self.netloc, self.path, self.params, self.query, self.fragment))
 
+NAME_ENTRY_AUTHORIZED = "authorized_form"
+NAME_ENTRY_ALTERNATIVE = "alternative_form"
 
+class NameEntry(object):
+    
+    def __repr__(self):
+        return "<NameEntry %s, %s, %s>" % (self.name.encode('utf-8'), " ".join(self.sources), self.n_type)
+    
+    def __init__(self, name, sources, n_type):
+        super(object, self)
+        self.name = name
+        self.name_norm = name_entry_normalize(self.name)
+        self.sources = []
+        if sources:
+            self.sources = sources
+        self.n_type = n_type
+        
+        
+class MergedNameEntry(object):
+
+    def __repr__(self):
+        return "<MergedNameEntry %s, %s>" % (self.name.encode('utf-8'), self.sources)
+        
+    def __init__(self, name, name_norm, sources):
+        self.name = name
+        self.name_norm = name_norm
+        self.sources = {}
+        if sources:
+           self.sources = sources
+    
+    def merge(self, name_entry, name_origin=""):
+        if len(name_entry.name) > self.name:
+            self.name = name_entry.name
+        self.merge_sources(name_entry, name_origin=name_origin)
+        
+    def merge_sources(self, name_entry, name_origin=""):
+        for source in name_entry.sources:
+            if source in self.sources:
+                if name_entry.n_type == NAME_ENTRY_AUTHORIZED and self.sources[source]['n_type'] == NAME_ENTRY_ALTERNATIVE:
+                    self.sources[source]["n_type"] = NAME_ENTRY_AUTHORIZED
+                    self.sources[source]["name_origin"] = name_origin
+            else:
+                self.sources[source] = {"source":source, "n_type":name_entry.n_type, "name_origin":name_origin}
+    @property
+    def preferenceScore(self):
+        if self.auth_source_present("LC"):
+            return 99
+        elif self.auth_source_present("LAC"):
+            return 98
+        elif self.auth_source_present("NLA"):
+            return 97
+        else:
+            return self.n_auth_sources
+    
+    def auth_source_present(self, code):
+        source = None
+        if code in self.sources:
+            source = self.sources[code]
+        elif code.lower() in self.sources:
+            source = self.sources[code.lower()]
+        if source and source["n_type"] == NAME_ENTRY_AUTHORIZED:
+            return True
+        return False
+    
+    @property
+    def n_auth_sources(self):
+        n = 0
+        for code in self.sources:
+            if self.sources[code]["n_type"] == NAME_ENTRY_AUTHORIZED:
+                n += 1
+        return n
+        
 def prev_dir(name, nest_n=1):
     for n in range(0, nest_n):
         name = os.path.dirname(name)
@@ -132,3 +203,25 @@ def strip_xml_ns(etree_doc):
     transform=etree.XSLT(xslt_doc)
     etree_doc=transform(etree_doc)
     return etree_doc
+    
+
+def name_entry_normalize(s):
+    pat1 = re.compile(ur'[/!,"();:\.?{}\-\u00BF\u00a1<>]', flags=re.UNICODE)
+    s = pat1.sub(" ", s)
+    pat2 = re.compile(ur"[\[\]'']", flags=re.UNICODE)
+    s = pat2.sub("", s)
+    return compress_spaces(s).lower()
+
+# def name_entry_normalize(etree_doc):
+#     norm_xslt='''<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+# <xsl:output method="xml" indent="no"/>
+# 
+# <xsl:template match="/">
+#         <foo><xsl:value-of select="lower-case(normalize-space(replace(replace(/foo/text(), '[/!,&quot;();:\.?{}\-&#xbf;&#xa1;&lt;>]', ' '),'[\[\]'']','')))" /></foo>
+#      </xsl:template>
+# </xsl:stylesheet>
+# '''
+#     xslt_doc=etree.parse(io.BytesIO(norm_xslt))
+#     transform=etree.XSLT(xslt_doc)
+#     etree_doc=transform(etree_doc)
+#     return etree_doc

@@ -6,6 +6,7 @@ import re
 import commands
 import logging
 import CheshirePy as cheshire
+import snac2.utils as utils
 
 import lxml.etree as etree
 
@@ -20,6 +21,7 @@ def checkNodeName(e,eName):
     if e.nodeType == e.ELEMENT_NODE and e.localName == eName:
         return True
     return False
+    
 
 class VIAF(object):
 
@@ -37,8 +39,11 @@ class VIAF(object):
         info['language'] = []
         info['nationality'] = []
         info['mainElementEl'] = []
+        info['authForms'] = {}
+        info['altForms'] = {}
         info['_raw'] = ""
         return info
+        
 
 def getEntityInformation(viafRecord):
     info = VIAF.get_empty_viaf_dict()
@@ -61,6 +66,7 @@ def getEntityInformation(viafRecord):
         info['nationality'] = getNationalityOfEntity(doc)
         info['mainElementEl'] = getMainHeadingEl2(doc2) # parsed element headings
         info['sources'] = getSources(doc2)
+        info['authForms'], info['altForms'] = getNameEntries(doc2)
         info['_raw'] = viafRecord
 #          except Exception, e:
 #              logging.info("ERROR: Could not parse VIAF file")
@@ -278,7 +284,145 @@ def getSources(doc):
     for source in sources:
         results.append(source.text)
     return results
+    
+def getNameEntries(doc2):
+    # obsoletes getMainHeadings2 and getX400s2 for the purpose of getting SNAC NameEntries out of VIAF
+    viaf_type = doc2.find("viaf:nameType", namespaces=NSMAP)
+    viaf_type = viaf_type.text
+    authorized_forms = getAuthorizedForms(doc2)
+    alternative_forms = getAlternativeForms(doc2, viaf_type)
+    return authorized_forms, alternative_forms
+    
 
+def getAuthorizedForms(doc2):
+    authorized_forms = {}
+    mainHeadingData = doc2.findall("viaf:mainHeadings/viaf:data", namespaces=NSMAP)
+    for data in mainHeadingData:
+        # authorized forms
+        name = data.find("viaf:text", namespaces=NSMAP)
+        sources = data.findall("viaf:sources/viaf:s", namespaces=NSMAP)
+        if name is not None:
+            name = name.text
+        if sources and len(sources):
+            sources = set([s.text for s in sources])
+        if name and sources:
+            if authorized_forms.get(name):
+                authorized_forms[name].sources.update(sources)
+            else:
+                authorized_forms[name] = utils.NameEntry(name=name, sources=sources, n_type=utils.NAME_ENTRY_AUTHORIZED)
+        else:
+            logging.warning("Failed to parse VIAF mainHeading for nameEntries")
+    return authorized_forms
+    
+    
+def getAlternativeFormsCorporate(data_field, dtype, tag, sources):
+    subfields = getX400_subfields(data_field)
+    name = u""
+    if tag != '410' and tag != "411":
+        return name
+    if dtype == "UNIMARC":
+        if "BNF" in sources:
+            # handle BNF
+            if subfields.get('a'):
+                name += subfields['a']
+            if subfields.get('b'):
+                name += u" " + subfields['b']
+            suffix = []
+            for code in ['c', 'g', 'd', 'e', 'f']:
+                if subfields.get(code):
+                    suffix.append(subfields[code])
+            if suffix:
+                name += u' (' + u' ; '.join(suffix) + u')'
+        
+        else:
+            # handle UNIMARC
+            for code in ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']:
+                if subfields.get(code):
+                    name += u" " + subfields[code]
+    else:
+        # treat as MARC21
+        if tag == "411":
+            codes = ['a', 'e', 'c', 'd', 'g', 'h', 'n', 'q']
+        else:
+            codes = ['a', 'b', 'c', 'd', 'e', 'g']
+        name_components  = []
+        for code in codes:
+            if subfields.get(code):
+                name_components.append(subfields[code])
+                #name += u" " + subfields[code]
+        if name_components:
+            name = u" ".join(name_components)
+    return name
+    
+def getAlternativeFormsPerson(data_field, dtype, tag, sources):
+    subfields = getX400_subfields(data_field)
+    name = u""
+    if tag != '400':
+        return name
+    if dtype == "UNIMARC":
+        if "BNF" in sources:
+            # handle BNF
+            if subfields.get('a'):
+                name += subfields['a']
+            if subfields.get('b'):
+                name += u", " + subfields['b']
+            if subfields.get('d'):
+                name += u" " + subfields['d']
+            suffix = []
+            for code in ['c', 'f']:
+                if subfields.get(code):
+                    suffix.append(subfields[code])
+            if suffix:
+                name += u' (' + " ; ".join(suffix) + u')'
+        else:
+            # handle UNIMARC
+            for code in ['a', 'b', 'c', 'd', 'f', 'g']:
+                if subfields.get(code):
+                    name += u" " + subfields[code]
+            name = name.strip()
+    else:
+        # treat as MARC21
+        for code in ['a', 'c', 'j', 'b', 'd', 'q']:
+            if subfields.get(code):
+                name += u" " + subfields[code]
+        name = name.strip()
+    return name
+    
+def getAlternativeForms(doc2, viaf_type):
+    alternative_forms = {}
+    x400_container = doc2.find("viaf:x400s", namespaces=NSMAP)
+    if x400_container is None:
+        return alternative_forms
+    x400s = x400_container.findall("viaf:x400", namespaces=NSMAP)
+    if not x400s:
+        return alternative_forms
+    for x400 in x400s:
+        data_field = x400.find("viaf:datafield",  namespaces=NSMAP)
+        sources = x400.findall("viaf:sources/viaf:s",  namespaces=NSMAP)
+        if data_field is not None and sources is not None:
+            dtype = data_field.attrib.get("dtype")
+            tag = data_field.attrib.get("tag")
+            subfields = getX400_subfields(data_field)
+            #sources = set([s.text for s in sources])
+            sources = set(["VIAF"])
+            if viaf_type.lower() == "corporate":
+                name = getAlternativeFormsCorporate(data_field=data_field, dtype=dtype, tag=tag, sources=sources)
+            else:
+                name = getAlternativeFormsPerson(data_field, dtype, tag, sources)
+            if name and sources:
+                if alternative_forms.get(name):
+                    alternative_forms[name].sources.update(sources)
+                else:
+                    alternative_forms[name] = utils.NameEntry(name=name, sources=sources, n_type=utils.NAME_ENTRY_ALTERNATIVE)
+    return alternative_forms
+
+def getX400_subfields(data_field):
+    subfields = data_field.findall("viaf:subfield", namespaces=NSMAP)
+    result = {}
+    for subfield in subfields:
+        result[subfield.attrib.get("code")] = subfield.text
+    return result
+    
 def config_cheshire(config_path=None, db="viaf"):
     if not config_path:
         import snac2.config.app as app
@@ -366,7 +510,6 @@ def query_cheshire_viaf(name, name_type=None, index="mainnamengram", config_path
             cheshire.closeresult(r)
         raise e
     return records
-
 
 def get_viaf_records(name, index="mainnamengram", name_type=None):
     results = query_cheshire_viaf(name=name, index=index, name_type=name_type)

@@ -492,6 +492,7 @@ class MergedRecord(meta.Base, Entity):
     to_date = Column(Date(), nullable=True)
     record_data = orm.deferred(Column(types.UnicodeText, nullable=True))
     valid = Column(types.Boolean, nullable=False, index=True, server_default="true")
+    processed = Column(types.Boolean, nullable=False, index=True, server_default="false")
     record_group_id = Column(types.BigInteger, ForeignKey('record_groups.id', onupdate="CASCADE", ondelete="SET NULL"), nullable=True, index=True )
     invalidates_record_id = Column(types.BigInteger, ForeignKey('merged_records.id', onupdate="CASCADE", ondelete="SET NULL"), nullable=True, index=True )
     created_at = Column(DateTime(), nullable=False, default=datetime.datetime.utcnow)
@@ -621,7 +622,7 @@ class MergedRecord(meta.Base, Entity):
         return candidates
 
     @classmethod
-    def get_all_assigned_starting_with(cls, id, options=None, session=None, iterate=False, limit=None, offset=None):
+    def get_all_assigned_starting_with(cls, id, end_at=None, force_reprocess=False, options=None, session=None, iterate=False, limit=None, offset=None):
         if not session:
             session = meta.Session
         q = session.query(cls)
@@ -629,6 +630,10 @@ class MergedRecord(meta.Base, Entity):
             q = q.options(*options)
         q = q.filter(cls.id >= id)
         q = q.filter(cls.canonical_id != None)
+        if end_at:
+            q = q.filter(cls.id <= end_at)
+        if not force_reprocess:
+            q = q.filter(cls.processed == False)
         q = q.order_by(cls.id.asc())
         if limit:
             q = q.limit(limit)
