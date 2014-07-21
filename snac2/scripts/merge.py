@@ -154,7 +154,7 @@ def createCombinedRecord(cpfRecords, viafInfo, dbpediaInfo=None, r_type="", cano
     cr.write('<?xml version="1.0" encoding="UTF-8"?>')
     cr.write("""<eac-cpf xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
          xmlns:owl="http://www.w3.org/2002/07/owl#"
-         xmlns:snac="http://socialarchive.iath.virginia.edu"
+         xmlns:snac="http://socialarchive.iath.virginia.edu/"
          xmlns="urn:isbn:1-931666-33-4"
          xmlns:xlink="http://www.w3.org/1999/xlink">""")
          
@@ -350,30 +350,34 @@ def createCombinedRecord(cpfRecords, viafInfo, dbpediaInfo=None, r_type="", cano
     cr.write("<description>")
         
     #Exist Dates
-    if len(mexistDates) > 0:
-        existDate = mexistDates[0] #Which one to choose ?
-        cr.write(existDate.toxml().encode('utf-8')) 
+    
+    existDate = viafInfo['dates']
+    if existDate != None and (existDate[0] !='0' or existDate[1] != '0'):
+        cr.write("<existDates>")
+        if r_type != "person":
+             pass
+        else:
+            cr.write("<dateRange>")
+            if existDate[0] and existDate[0] != '0':
+                term_start = "Birth"
+                cr.write("<fromDate standardDate=\"%s\" localType=\"http://socialarchive.iath.virginia.edu/control/term#%s\">" % (snac2.cpf.pad_exist_date(existDate[0]), term_start))
+                cr.write(escape(existDate[0]))
+                cr.write("</fromDate>")
+            if existDate[1] and existDate[1] != '0':
+                term_end = "Death"
+                cr.write("<toDate standardDate=\"%s\" localType=\"http://socialarchive.iath.virginia.edu/control/term#%s\">" % (snac2.cpf.pad_exist_date(existDate[1]), term_end))
+                cr.write(escape(existDate[1]))
+                cr.write("</toDate>")
+            cr.write("</dateRange>")
+        cr.write("</existDates>")
     else:
-        existDate = viafInfo['dates']
-        if existDate != None and (existDate[0] !='0' or existDate[1] != '0'):
-            cr.write("<existDates>")
-            if r_type != "person":
-                 pass
-            else:
-                cr.write("<dateRange>")
-                if existDate[0] and existDate[0] != '0':
-                    term_start = "Birth"
-                    cr.write("<fromDate standardDate=\"%s\" localType=\"http://socialarchive.iath.virginia.edu/control/term#%s\">" % (snac2.cpf.pad_exist_date(existDate[0]), term_start))
-                    cr.write(escape(existDate[0]))
-                    cr.write("</fromDate>")
-                if existDate[1] and existDate[1] != '0':
-                    term_end = "Death"
-                    cr.write("<toDate standardDate=\"%s\" localType=\"http://socialarchive.iath.virginia.edu/control/term#%s\">" % (snac2.cpf.pad_exist_date(existDate[1]), term_end))
-                    cr.write(escape(existDate[1]))
-                    cr.write("</toDate>")
-                cr.write("</dateRange>")
-            cr.write("</existDates>")
-
+        if len(mexistDates) > 0:
+            existDate = mexistDates[0]  
+            cr.write(existDate.toxml().encode('utf-8')) 
+        else:
+            #logging.info("No exist dates")
+            pass
+            
     
     # functions
     
@@ -433,7 +437,10 @@ def createCombinedRecord(cpfRecords, viafInfo, dbpediaInfo=None, r_type="", cano
     entityNationality = viafInfo['nationality']
     for nationality in set(entityNationality):
         cr.write('<localDescription localType="http://viaf.org/viaf/terms#nationalityOfEntity">')
-        cr.write('<placeEntry countryCode="%s"/>' % escape(nationality).encode('utf-8'))
+        if not nationality.isupper() or not nationality.isalpha():
+            cr.write('<term>%s</term>' % escape(nationality).encode('utf-8'))
+        else:
+            cr.write('<placeEntry countryCode="%s"/>' % escape(nationality).encode('utf-8'))
         cr.write('</localDescription>')
         
     #Gender from VIAF
@@ -477,9 +484,9 @@ def createCombinedRecord(cpfRecords, viafInfo, dbpediaInfo=None, r_type="", cano
     for concat_text in biogText.keys():
         cr.write("<biogHist>")
         for text in biogText[concat_text]['text']:
-            cr.write("%s" % escape(text).encode('utf-8'))
+            cr.write("%s" % text.encode('utf-8')) # do not escape these otherwise the embedded <p> tags will be lost
         for citation in biogText[concat_text]['citation']:
-            cr.write("%s" % escape(citation).encode('utf-8'))
+            cr.write("%s" % citation.encode('utf-8')) # do not escape
         cr.write("</biogHist>")
         #cr.write(biogHist['raw'].encode('utf-8'))
         #print biogHist['raw'].encode('utf-8')
@@ -692,16 +699,17 @@ def create_merged_records_loop(start_at, is_fake=True, batch_size=1000, total_li
 
 def output_record_by_ark(ark_id):
     record = models.MergedRecord.get_by_canonical_id(canonical_id=ark_id)
-    doc = merge_record(record, canonical_id=record.canonical_id)
-    if not doc:
-        logging.warning("failed %d" %(record.id))
-    fname = record.canonical_id.split("ark:/")[1].replace("/", "-")
-    full_fname = os.path.join(app_config.merged, fname+".xml")
-    wf = open(full_fname,"w")
-    wf.write(doc.toxml(encoding="utf-8"))
-    wf.flush()
-    wf.close()
-    logging.info("%d: %s" %(record.id, full_fname))
+    if record:
+        doc = merge_record(record, canonical_id=record.canonical_id)
+        if not doc:
+            logging.warning("failed %d" %(record.id))
+        fname = record.canonical_id.split("ark:/")[1].replace("/", "-")
+        full_fname = os.path.join(app_config.merged, fname+".xml")
+        wf = open(full_fname,"w")
+        wf.write(doc.toxml(encoding="utf-8"))
+        wf.flush()
+        wf.close()
+        logging.info("%d: %s" %(record.id, full_fname))
 
             
 def reassign_merged_records(batch_size=1000, from_file=None):

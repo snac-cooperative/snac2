@@ -35,4 +35,4 @@ bl = '/lv1/data/extract/britlib'
 viaf = '/db/projects/lcshrecommend/catalogs/SNAC/VIAF/data/'
 
 #Path to the directory where the merged records are created (Create directory)
-merged = '/projects/snac-output/new-run'
+merged = '/projects/snac-output/new-run2'

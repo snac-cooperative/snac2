@@ -633,7 +633,7 @@ class MergedRecord(meta.Base, Entity):
         if end_at:
             q = q.filter(cls.id <= end_at)
         if not force_reprocess:
-            q = q.filter(cls.processed == False)
+            q = q.filter(cls.processed == False)  
         q = q.order_by(cls.id.asc())
         if limit:
             q = q.limit(limit)

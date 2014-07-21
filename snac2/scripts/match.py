@@ -75,9 +75,9 @@ def match_persons(batch_size=None, starts_at=None, ends_at=None):
                     logging.info("accepted: %s" % (viaf_id))
             elif match_quality == -1:
                 #no viaf match at all
-                candidate = None
-                match_quality = -1
-#                candidate, match_quality = match_person_ngram_postgres(record)
+                #candidate = None
+                #match_quality = -1
+                candidate, match_quality = match_person_ngram_postgres(record)
                 if not match_quality:
                     pass
                 elif match_quality == -1:
