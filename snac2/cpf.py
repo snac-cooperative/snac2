@@ -168,17 +168,17 @@ def parseAssociationsRaw(doc):
 #Parse resource associations for a eac record, return the raw xml
 def parseResourceAssociationsRaw(doc):
     
-    try:
+  
         #doc = xml.dom.minidom.parseString(open(eac).read().replace('localType="Leader', 'localType="http://socialarchive.iath.virginia.edu/control/term#Leader'))
-        relation = doc.getElementsByTagName("relations")
-        if len(relation) > 0:
-            resourceRelations = relation[0].getElementsByTagName("resourceRelation")
-            return resourceRelations
-        else:
-            return None
-    except Exception, e:
-        logging.info("ERROR: Unable to extract resource association information from %s" %eac)
+    relation = doc.getElementsByTagName("relations")
+    if len(relation) > 0:
+        resourceRelations = relation[0].getElementsByTagName("resourceRelation")
+        return resourceRelations
+    else:
         return None
+#     except Exception, e:
+#         logging.info("ERROR: Unable to extract resource association information from %s" %eac)
+#         return None
 
 
 #Parse the associations from a eac record

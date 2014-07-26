@@ -5,8 +5,6 @@ setup(
     packages = find_packages(),
     scripts = [],
 
-    # Project uses reStructuredText, so ensure that the docutils get
-    # installed or upgraded on the target machine
     # NOTE: this also requires CheshirePy from the cheshire source tree - yliu
     install_requires = ['SQLAlchemy', 'python-dateutil==1.5', 'nameparser', 'jellyfish', 'IPython==0.13.1', 'lxml', 'argparse', 'pytz', 'psycopg2'],
 

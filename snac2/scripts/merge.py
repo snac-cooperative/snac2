@@ -272,76 +272,6 @@ def createCombinedRecord(cpfRecords, viafInfo, dbpediaInfo=None, r_type="", cano
                     cr.write(source["source"])
                     cr.write('</alternativeForm>\n')
         cr.write('</nameEntry>\n')
-
-
-#     if mnames:
-#         mnames_index = set()
-#         mnames = filter(lambda name: snac2.cpf.extract_subelement_content_from_entry(name, "part") not in mnames_index and (mnames_index.add(snac2.cpf.extract_subelement_content_from_entry(name, "part")) or True), mnames)
-#         mnames.sort(key=lambda name: len(snac2.cpf.extract_subelement_content_from_entry(name, "part")), reverse=True)
-
-    # TODO: patch in the new branch; this one's pretty dead
-    
-   #  #VIAF Mainheadings
-#     viaf_name_nodes = viafInfo['mainHeadingsData']
-#     viaf_names = []
-#     viaf_name_index = {}
-#     LOC_name = []
-#     for nameEntry in viaf_name_nodes:
-#         text_nodes =  nameEntry.getElementsByTagName("text")
-#         source_nodes = nameEntry.getElementsByTagName("s")
-#         name = ""
-#         authorized_form = ""
-#         
-#         if text_nodes:
-#             name = text_nodes[0].firstChild.nodeValue
-#             if source_nodes:
-#                 for source_node in source_nodes:
-#                     source = source_node.firstChild.nodeValue
-#                     if source and source.strip() == "LC":
-#                         authorized_form = "LoC"
-#                         LOC_name = (name, authorized_form)
-#                         break
-#         if not authorized_form:
-#             authorized_form = "VIAF"
-#         if name in viaf_name_index:
-#             pass
-#         else:
-#             viaf_name_index[name] = 1
-#             if authorized_form != "LoC":
-#                 viaf_names.append((name, authorized_form))
-#     if LOC_name:
-#         viaf_names = [LOC_name] + viaf_names
-#     for name in viaf_names:
-#         cr.write('<nameEntry localType="http://viaf.org/viaf/terms#mainHeadings/data/text">')
-#         cr.write('<part>')
-#         cr.write(escape(name[0]).encode('utf-8'))
-#         cr.write('</part>')
-#         if (name[1] == "LoC"):
-#             cr.write('<authorizedForm>LoC</authorizedForm>')
-#         else:
-#             cr.write('<alternativeForm>VIAF</alternativeForm>')
-#         cr.write('</nameEntry>')
-#     for name in mnames:
-#         cr.write(name.toxml().encode('utf-8'))
-        
-        
- #    #VIAF X400s 
-# #     for nameEntry in set(viafInfo['x400s']) :
-# #         cr.write('<nameEntry localType="http://viaf.org/viaf/terms#x400s/400">')
-# #         cr.write('<part localType="http://viaf.org/viaf/terms#x400s/400/a">')
-# #         cr.write(escape(nameEntry).encode('utf-8'))
-# #         cr.write('</part>')
-# #         cr.write('<alternativeForm>VIAF</alternativeForm>')
-# #         cr.write('</nameEntry>')
-
-#     for x400 in viafInfo['x400s'] :
-#         cr.write('<nameEntry localType="http://viaf.org/viaf/terms#x400s/%s">' % (x400['tag']))
-#         for subfield in x400['subfields']:
-#             cr.write('<part localType="http://viaf.org/viaf/terms#x400s/%s/%s">' % (x400['tag'], subfield['code']))
-#             cr.write(escape(subfield['value']).encode('utf-8'))
-#             cr.write('</part>')
-#         cr.write('<alternativeForm>VIAF</alternativeForm>')
-#         cr.write('</nameEntry>')
         
     #END identity   
     cr.write("</identity>")
@@ -354,26 +284,30 @@ def createCombinedRecord(cpfRecords, viafInfo, dbpediaInfo=None, r_type="", cano
     existDate = viafInfo['dates']
     if existDate != None and (existDate[0] !='0' or existDate[1] != '0'):
         cr.write("<existDates>")
-        if r_type != "person":
-             pass
-        else:
-            cr.write("<dateRange>")
-            if existDate[0] and existDate[0] != '0':
-                term_start = "Birth"
-                cr.write("<fromDate standardDate=\"%s\" localType=\"http://socialarchive.iath.virginia.edu/control/term#%s\">" % (snac2.cpf.pad_exist_date(existDate[0]), term_start))
-                cr.write(escape(existDate[0]))
-                cr.write("</fromDate>")
-            if existDate[1] and existDate[1] != '0':
-                term_end = "Death"
-                cr.write("<toDate standardDate=\"%s\" localType=\"http://socialarchive.iath.virginia.edu/control/term#%s\">" % (snac2.cpf.pad_exist_date(existDate[1]), term_end))
-                cr.write(escape(existDate[1]))
-                cr.write("</toDate>")
-            cr.write("</dateRange>")
+        cr.write("<dateRange>")
+        if existDate[0] and existDate[0] != '0':
+            term_start = "Birth"
+            if r_type != "person":
+                term_start = "Active"
+            cr.write("<fromDate standardDate=\"%s\" localType=\"http://socialarchive.iath.virginia.edu/control/term#%s\">" % (snac2.cpf.pad_exist_date(existDate[0]), term_start))
+            cr.write(escape(existDate[0]))
+            cr.write("</fromDate>")
+        if existDate[1] and existDate[1] != '0':
+            term_end = "Death"
+            if r_type != "person":
+                term_start = "Active"
+            cr.write("<toDate standardDate=\"%s\" localType=\"http://socialarchive.iath.virginia.edu/control/term#%s\">" % (snac2.cpf.pad_exist_date(existDate[1]), term_end))
+            cr.write(escape(existDate[1]))
+            cr.write("</toDate>")
+        cr.write("</dateRange>")
         cr.write("</existDates>")
     else:
         if len(mexistDates) > 0:
-            existDate = mexistDates[0]  
-            cr.write(existDate.toxml().encode('utf-8')) 
+            bestExistDate = mexistDates[0]
+            #for existDate in mexistDates[1:]:
+            #    if (is_better_existence(bestExistDate, existDate)):
+            #        bestExistDate = existDate
+            cr.write(bestExistDate.toxml().encode('utf-8')) 
         else:
             #logging.info("No exist dates")
             pass
@@ -573,6 +507,34 @@ def merge_name_entries(viaf_auths, viaf_alts, cpf_identities):
                 merged_names[name_norm].merge_sources(name_entry, name_origin=name_origin)
     return merged_names
     
+def is_better_existence(original, new):
+    original_from = original.getElementsByTagName("fromDate")
+    original_to = original.getElementsByTagName("toDate")  
+    new_from = new.getElementsByTagName("fromDate")
+    new_to = new.getElementsByTagName("toDate")
+    if original_from and new_from:
+        original_from_date = original_from[0].attributes["standardDate"].value
+        new_from_date = new_from[0].attributes["standardDate"].value
+        original_from_type = original_from[0].attributes["localType"].value
+        new_from_type = new_from[0].attributes["localType"].value
+        if new_from_type == models.RECORD_DATE_TYPE_BIRTH and (not original_from_type or original_from_type == models.RECORD_DATE_TYPE_ACTIVE):
+             return True
+        elif new_from_type is not None and new_from_type == original_from_type:
+            if len(original_from_date) < len(new_from_date):
+                return True
+    elif original_to and new_to:
+        original_to_date = original_to[0].attributes["standardDate"].value
+        new_to_date = new_to[0].attributes["standardDate"].value
+        original_to_type = original_to[0].attributes["localType"].value
+        new_to_type = new_to[0].attributes["localType"].value
+        if new_to_type == models.RECORD_DATE_TYPE_DEATH and (not original_from_type or original_from_type == models.RECORD_DATE_TYPE_ACTIVE):
+             return True
+        elif new_to_type is not None and new_to_type == original_to_type:
+            if len(original_to_date) < len(new_to_date):
+                return True
+    return False
+
+    
 def merge_record(merged_record, canonical_id=""):
     record_group = merged_record.record_group
     logging.info("creating output for %d" % (record_group.id))
@@ -591,53 +553,21 @@ def merge_record(merged_record, canonical_id=""):
         doc = None
         logging.warning( combined_record )
     return doc
-        
-def output_all_records(start_at=0):
-    merged_record = models.MergedRecord.get_all_by_ids_starting_with(id=start_at, iterate=True)
-    for record in merged_record:
-        doc = merge_record(record, canonical_id=record.canonical_id)
-        if not doc:
-            logging.warning("failed %d" %(record.id))
-            continue
-        fname = record.canonical_id.split("ark:/")[1].replace("/", "-")
-        full_fname = os.path.join(app_config.merged, fname+".xml")
-        wf = open(full_fname,"w")
-        wf.write(doc.toxml(encoding="utf-8"))
-        wf.flush()
-        wf.close()
-        logging.info("%d: %s" %(record.id, full_fname))
-        
-# def output_all_records_loop(start_at, batch_size=1000, end_after=None):
-#     n = 0
-#     while True:
-#         logging.info( "retrieving new batch..." )
-#         merged_record = models.MergedRecord.get_all_assigned_starting_with(id=start_at, iterate=True, limit=batch_size, offset=n)
-#         if not merged_record:
-#             break
-#         m = 0
-#         for record in merged_record:
-#             m += 1
-#             doc = merge_record(record, canonical_id=record.canonical_id)
-#             if not doc:
-#                 logging.warning("failed %d" %(record.id))
-#                 #continue
-#                 raise ValueError(record.id)
-#             if not record.canonical_id:
-#                 raise ValueError("This record has no assigned ARK id")
-#             fname = record.canonical_id.split("ark:/")[1].replace("/", "-")
-#             full_fname = os.path.join(app_config.merged, fname+".xml")
-#             wf = open(full_fname,"w")
-#             wf.write(doc.toxml(encoding="utf-8"))
-#             wf.flush()
-#             wf.close()
-#             logging.info("%d: %s" %(record.id, full_fname))
-#             record.processed = True
-#             models.commit()
-#         if n == n+m:
-#             break
-#         n += m
-#         if end_after and n >= end_after:
-#             break
+#         
+# def output_all_records(start_at=0):
+#     merged_record = models.MergedRecord.get_all_by_ids_starting_with(id=start_at, iterate=True)
+#     for record in merged_record:
+#         doc = merge_record(record, canonical_id=record.canonical_id)
+#         if not doc:
+#             logging.warning("failed %d" %(record.id))
+#             continue
+#         fname = record.canonical_id.split("ark:/")[1].replace("/", "-")
+#         full_fname = os.path.join(app_config.merged, fname+".xml")
+#         wf = open(full_fname,"w")
+#         wf.write(doc.toxml(encoding="utf-8"))
+#         wf.flush()
+#         wf.close()
+#         logging.info("%d: %s" %(record.id, full_fname))
 
 def output_all_records_loop(start_at, batch_size=1000, end_at=None):
     while True:
@@ -743,7 +673,7 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--id", help="only assemble for this specific ARK ID")
     parser.add_argument("-s", "--starts_at", help="start the assembly at this position", default=0, type=int)
     parser.add_argument("-e", "--ends_at", help="end the assembly at this position", type=int)
-    parser.add_argument("-r", "--real", action="store_true", help="request real ARK IDs")
+    parser.add_argument("-r", "--real", action="store_true", help="request real ARK IDs; do not use this unless in production mode")
     parser.add_argument("-n", "--no_id", action="store_true", help="do not assign canonical ids")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-m", "--merge", action="store_true", help="create merge records; should be run before assembly")

@@ -457,7 +457,7 @@ def query_cheshire_viaf_id(viaf_id, name_type="person", db="viaf", limit=1, inde
     return record
         
 
-def query_cheshire_viaf(name, name_type=None, index="mainnamengram", config_path=None, db='viaf', limit=10):
+def query_cheshire_viaf(name, name_type=None, index="mainnamengram", config_path=None, db='viaf', limit=10, is_spirit=False):
     r = None
     try:
     
@@ -477,6 +477,11 @@ def query_cheshire_viaf(name, name_type=None, index="mainnamengram", config_path
         searchstr = "%s '%s'" % (index, name)
         if name_type:
             searchstr += " and nametype '%s'" % (name_type)
+
+        if is_spirit:
+            searchstr = "(" +searchstr + ")" + " and spirit 1"
+        else:
+            searchstr = "(" +searchstr + ")" + " not spirit 1"
         logging.info("searching for '%s'" % searchstr.encode('utf-8'))
         r = cheshire.Search(searchstr.encode('utf-8'))
         records = []
@@ -510,11 +515,6 @@ def query_cheshire_viaf(name, name_type=None, index="mainnamengram", config_path
             cheshire.closeresult(r)
         raise e
     return records
-
-def get_viaf_records(name, index="mainnamengram", name_type=None):
-    results = query_cheshire_viaf(name=name, index=index, name_type=name_type)
-    #results = [getEntityInformation(r) for r in results]
-    return results
     
 if __name__ == "__main__":
     viaf = query_cheshire_viaf(sys.argv[1])

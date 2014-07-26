@@ -75,9 +75,9 @@ def match_persons(batch_size=None, starts_at=None, ends_at=None):
                     logging.info("accepted: %s" % (viaf_id))
             elif match_quality == -1:
                 #no viaf match at all
-                #candidate = None
-                #match_quality = -1
-                candidate, match_quality = match_person_ngram_postgres(record)
+                candidate = None
+                match_quality = -1
+                #candidate, match_quality = match_person_ngram_postgres(record)
                 if not match_quality:
                     pass
                 elif match_quality == -1:
@@ -198,7 +198,7 @@ def match_exact(record, record_type):
         quality_date_from, quality_date_to = check_existence_dates(record, authority_dates)
         if quality_date_from != 0 and quality_date_to != 0:
             return record_group, record_group.viaf_id, record_group.viaf_record, 1
-    viaf_records = viaf.get_viaf_records(record.name_norm, index="xmainname[5=100]", name_type=record_type)
+    viaf_records = viaf.query_cheshire_viaf(record.name_norm, index="xmainname[5=100]", name_type=record_type)
     if viaf_records:
         viaf_record = viaf_records[0]
         viafInfo = viaf.getEntityInformation(viaf_record)
@@ -228,24 +228,27 @@ def match_exact(record, record_type):
         return None, None, None, 0
         
     
-def match_person_exact(record):
-#     TODO: need an existence date check
-    record_group = models.PersonGroup.get_by_name(record.name_norm)
-    if record_group:
-        quality_date_from = DATE_NO_DATA
-        quality_date_to = DATE_NO_DATA
-        for candidate in record_group.records:
-            date_from, date_to = check_existence_dates_with_datetime(record, candidate.to_date, candidate.from_date)
-            if date_from > quality_date_from:
-                quality_date_from = date_from
-            if date_to > quality_date_to:
-                quality_date_to = date_to
-        if len(record.name_norm) > 10 and (quality_date_from > DATE_MATCH_FAIL or quality_date_to > DATE_MATCH_FAIL):
-            logging.info("record_group %d found in database by name for record %d" % (record_group.id, record.id))
-            return record_group, record_group.viaf_id, record_group.viaf_record, 1
-        else:
-            logging.info("failed existence check record_group %d for record %d" % (record_group.id, record.id))
-    viaf_records = viaf.query_cheshire_viaf(record.name_norm, name_type="person", index="xmainname[5=100]", limit=1)
+def match_person_exact(record, force_rematch=False):
+    if not force_rematch:
+        record_group = models.PersonGroup.get_by_name(record.name_norm)
+        if record_group:
+            quality_date_from = DATE_NO_DATA
+            quality_date_to = DATE_NO_DATA
+            for candidate in record_group.records:
+                date_from, date_to = check_existence_dates_with_datetime(record, candidate.to_date, candidate.from_date)
+                if date_from > quality_date_from:
+                    quality_date_from = date_from
+                if date_to > quality_date_to:
+                    quality_date_to = date_to
+            if len(record.name_norm) > 10 and (quality_date_from > DATE_MATCH_FAIL or quality_date_to > DATE_MATCH_FAIL):
+                logging.info("record_group %d found in database by name for record %d" % (record_group.id, record.id))
+                return record_group, record_group.viaf_id, record_group.viaf_record, 1
+            else:
+                logging.info("failed existence check record_group %d for record %d" % (record_group.id, record.id))
+    is_spirit = False
+    if "(spirit)" in record.name.lower():
+        is_spirit = True
+    viaf_records = viaf.query_cheshire_viaf(record.name_norm, name_type="person", index="xmainname[5=100]", limit=1, is_spirit=is_spirit)
     viaf_record = None
     if viaf_records:
         viaf_record = viaf_records[0]
@@ -381,7 +384,10 @@ def match_person_ngram_postgres(record):
         
 def viaf_match_ngram(record):
     '''accepts a Record as input, and returns a VIAF record matching the given record and a quality value between 0 and 1'''
-    viaf_matches = viaf.get_viaf_records(record.name_norm, index="mainnamengram", name_type="person")
+    is_spirit = False
+    if "(spirit)" in record.name.lower():
+        is_spirit = True
+    viaf_matches = viaf.query_cheshire_viaf(record.name_norm, index="mainnamengram", name_type="person", is_spirit=is_spirit)
     viaf_matches = [viaf.getEntityInformation(r) for r in viaf_matches]
     #possible_matches = []
     if viaf_matches:
@@ -510,7 +516,7 @@ def viaf_match_keyword(record, name_type="person"):
     if name_type == "corporate":
         name_norm = utils.strip_corp_abbrevs(utils.strip_accents(utils.normalize_name_without_punc_with_space(name_norm)))
     logging.info("keyword matching on %d %s" % (record.id, name_norm))
-    viaf_matches = viaf.get_viaf_records(name_norm, index="mainname", name_type=name_type)
+    viaf_matches = viaf.query_cheshire_viaf(name_norm, index="mainname", name_type=name_type)
     viaf_matches = [viaf.getEntityInformation(r) for r in viaf_matches]
     for m in viaf_matches:
         candidate_name = utils.strip_corp_abbrevs(utils.strip_accents(utils.normalize_name_without_punc_with_space(m['mainHeadings'][0])))
@@ -535,10 +541,10 @@ if __name__ == "__main__":
     import sys
     import argparse
     parser = argparse.ArgumentParser()
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("-p", "--person", action="store_true", help="match persons")
-    group.add_argument("-c", "--corporate", action="store_true", help="match corporate entities")
-    group.add_argument("-f", "--family", action="store_true", help="match families")
+    #group = parser.add_mutually_exclusive_group()
+    parser.add_argument("-p", "--person", action="store_true", help="match persons")
+    parser.add_argument("-c", "--corporate", action="store_true", help="match corporate entities")
+    parser.add_argument("-f", "--family", action="store_true", help="match families")
     parser.add_argument("-s", "--starts_at", help="start the match at this ID", type=int)
     parser.add_argument("-e", "--ends_at", help="stop matching at this ID", type=int)
     
