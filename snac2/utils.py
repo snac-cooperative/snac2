@@ -136,7 +136,7 @@ def strip_accents(s):
     return ''.join((c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn' ))
 
 
-# or equivalently and much more efficiently
+# source from: http://stackoverflow.com/a/93029
 control_chars = ''.join(map(unichr, range(0,32) + range(127,160)))
 control_char_re = re.compile('[%s]' % re.escape(control_chars))
 def strip_controls(s):

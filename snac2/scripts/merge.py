@@ -660,7 +660,17 @@ def reassign_merged_records(batch_size=1000, from_file=None):
             else:
                 if len(canonical_ids) <= 0:
                     raise ValueError("ran out of canonical_ids at record %d" % (record.id))
-                record.canonical_id = canonical_ids.pop(0)
+                canonical_id = canonical_ids.pop(0)
+                while canonical_ids and canonical_id:
+                    existing = models.MergedRecord.get_by_canonical_id(canonical_id)
+                    if not existing:
+                        record.canonical_id = canonical_id
+                        logging.info("%s assigned to %d" %(canonical_id, record.id))
+                        break
+                    else:
+                        logging.info("%s already used" %(canonical_id))
+                        canonical_id = canonical_ids.pop(0)
+                        continue
             models.commit()
             logging.info("%d: %s" %(record.id, record.canonical_id))
     #return merged_records
