@@ -6,7 +6,7 @@ Python match/merge code for SNAC
 Installing Match/Merge Code
 ---------------------------
 
-Once Cheshire and CheshirePy have been built, set up, and installed, and VIAF has been correctly indexed by cheshire (instructions available at the Cheshire repository), the snac match-merge code can be installed and executed.
+Once Cheshire and CheshirePy have been built, set up, and installed, and VIAF has been correctly indexed by cheshire (instructions available at the [Cheshire repository](https://github.com/snac/cheshire)), the snac match-merge code can be installed and executed.
 
 1. Checkout the snac2 code from this repository using `git clone https://github.com/snac/snac2.git`.  All the following paths will be relative to the root directory of that repository.
 2. Set up a postgres database (steps omitted).  We will assume the database `snac_test` has been set up with user `snac_user` and password `snac_password`.
