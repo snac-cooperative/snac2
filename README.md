@@ -29,13 +29,16 @@ Once Cheshire and CheshirePy have been built, set up, and installed, and VIAF ha
 	* Change permissions on the package manager file used in this step to avoid command-line warnings on future python commands.  This can be done with the command `chmod go-w ~/.python-eggs`.
 5. Initialize the database using `python snac2/scripts/init_db.py`.
 6. Test that everything works by running `python shell.py`, which should enter you into the following shell:  
-```
-=== Welcome to SNAC Merge Tool Shell ===
-using database postgresql+psycopg2://username:@/snac-test
-	 
-	In [1]: 
-```
+    ```
+    === Welcome to SNAC Merge Tool Shell ===
+    using database postgresql+psycopg2://username:@/snac-test
+    	 
+    	In [1]: 
+    ```
 To exit, press `Control+D` and answer the prompt.  If there are no errors, you are ready to run the snac code.
+7. Update the static names in the python code:
+    * Edit `snac2/scripts/match.py` and change the line `viaf.config_cheshire(db="viaf")` so that `db` equals the name of your Cheshire database, aka the text inside the `FILETAG` Cheshire config.
+
 
 Running Match/Merge Code
 ------------------------
@@ -50,3 +53,21 @@ Now you are ready to run the code.
 		* Type arguments: `-p` for Persons, `-c` for Corporate Bodies, or `-f` for Families.  Note: only one at a time should be used.
 		* `-s STARTS_AT` record to start at (optional)
 		* `-e ENDS_AT` record to end at (optional)
+    * The following command will match all three types of records:  
+        ```
+        python snac2/scripts/match.py -p && python snac2/scripts/match.py -c && python snac2/scripts/match.py -f
+        ```
+* Merging Record Groups
+    * Merging is performed in two steps
+        1. Merge: this step creates the matched records from the record groups and assigns unique ARK ids.  For testing purposes, it is very important to run without the `-r` command line argument.  Without it, the script will ask for temporary ARKs.  The real merge command can be run as  
+            ```
+            python snac2/scripts/merge.py -r -m
+            ```
+        while the command that should be used for testing is  
+            ```
+            python snac2/scripts/merge.py -m
+            ```
+        2. Assemble: this step exports the matched records out to XML files.  It is run as  
+            ```
+            python snac2/scripts/merge.py -a
+            ```
