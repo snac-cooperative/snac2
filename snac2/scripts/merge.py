@@ -420,7 +420,10 @@ def createCombinedRecord(cpfRecords, viafInfo, dbpediaInfo=None, r_type="", cano
         for text in biogText[concat_text]['text']:
             cr.write("%s" % text.encode('utf-8')) # do not escape these otherwise the embedded <p> tags will be lost
         for citation in biogText[concat_text]['citation']:
-            cr.write("%s" % citation.encode('utf-8')) # do not escape
+            if citation != None:
+            	cr.write("%s" % citation.encode('utf-8')) # do not escape
+            else:
+                logging.warning("%i : Citation in biogHist was null, and should not be" % i)
         cr.write("</biogHist>")
         #cr.write(biogHist['raw'].encode('utf-8'))
         #print biogHist['raw'].encode('utf-8')
@@ -456,8 +459,10 @@ def createCombinedRecord(cpfRecords, viafInfo, dbpediaInfo=None, r_type="", cano
     if maybes:
         for merge_candidate in maybes:
             #print merge_candidate.record_group.records[0].name.__repr__()
-            cr.write('<cpfRelation xlink:type="simple"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#mayBeSameAs" xlink:href="%s" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s"><relationEntry>%s</relationEntry></cpfRelation>' % (merge_candidate.canonical_id.encode('utf-8'), r_type_t.encode('utf-8'), escape(merge_candidate.record_group.records[0].name).encode('utf-8'))) 
-
+            if merge_candidate.canonical_id != None and r_type_t != None and merge_candidate.record_group.records[0].name != None:
+                cr.write('<cpfRelation xlink:type="simple"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#mayBeSameAs" xlink:href="%s" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s"><relationEntry>%s</relationEntry></cpfRelation>' % (merge_candidate.canonical_id.encode('utf-8'), r_type_t.encode('utf-8'), escape(merge_candidate.record_group.records[0].name).encode('utf-8'))) 
+            else:
+                raise RuntimeError("Problem exporting maybe merge candidate: missing canonical_id, r_type_t, or name.")
         
     #Resource Relations
     for resourceRelation in mresourceRelations:
