@@ -192,6 +192,9 @@ def match_exact(record, record_type):
     elif record_type == "family":
         group = models.FamilyGroup
     record_group = group.get_by_name(record.name_norm)
+#     if record_type == "corporate" and record_group and len(record.name_norm) > 20:
+#         logging.info("Found exact match using length check: %d %s" % (record_group.id, record.name_norm))
+#         return record_group, record_group.viaf_id, record_group.viaf_record, 1
     if record_group and record_group.viaf_record:
         viafInfo = viaf.getEntityInformation(record_group.viaf_record)
         authority_dates = viafInfo.get('dates')
@@ -321,6 +324,9 @@ def compute_name_match_quality(x, y):
                     elif not match_name.middle and not query_name.middle:
                         # no middle names at all
                         return 1
+                    elif ((match_name.middle and query_name.middle) and query_name.middle[0] != match_name.middle[0]):
+                        # just to make sure
+                        return 0
                     elif (len(match_name.middle)==1 and match_name.middle[0] == query_name.middle[0]):
                         logging.info("name match : %s for %s as abbrev" % (x, y))
                         return 0.99
@@ -330,7 +336,7 @@ def compute_name_match_quality(x, y):
                     else:
                         length = utils.computeJaroWinklerDistance((match_name.first + " " + match_name.last).encode('utf-8'), (query_name.first + " " + query_name.last).encode('utf-8'))
                         logging.info("name match: %s for %s as name %0.4f" % (x, y, length))
-                        return ACCEPT_THRESHOLD if length >= ACCEPT_THRESHOLD else length
+                        return ACCEPT_THRESHOLD-0.00001 if length >= ACCEPT_THRESHOLD else length
                 elif (len(match_name.first) == 1 or len(query_name.first) == 1):
                     # if first initials only, only accept if it's a long match on middle
                     if query_name.middle and len(query_name.middle) > 1:
@@ -455,12 +461,13 @@ def viaf_match_ngram(record):
 def match_families(batch_size=1000):
     records = models.FamilyOriginalRecord.get_all_unprocessed_records(limit=batch_size)
     for record in records:
-        if not record.record_group:
+        record_group = record.record_group
+        if not record_group:
             record_group = models.FamilyGroup(name=record.name_norm)
             record_group.save()
             models.flush()
             
-        if record.id not in [r.id for r in record_group.records]:
+        if record.id not in [r.id for r in record.record_group.records]:
             record = models.FamilyOriginalRecord.get_by_id(record.id)
             record.record_group_id = record_group.id
                         

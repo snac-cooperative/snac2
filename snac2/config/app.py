@@ -9,16 +9,18 @@ VIAF_CONFIG = "/lv1/home/rlarson/Cheshire_Config/CONFIG.VIAF4"
 log = 'logs/snac.log_20120625.1'
 
 #Library of congress
-loc = '/projects/snac-data/loc'
+lc = '/data/extract/ead_sep_30_2014/lc/lc'
 
 #Northwest Digital 
-nwda = '/projects/snac-data/nwda'
+nwda = '/data/extract/ead_nwda_new/nwda'
 
 #Online Archive of California
-oac = '/projects/snac-data/oac'
+oac = '/data/extract/ead_sep_30_2014/oac/oac'
 
 #Virginia Heritage (new)
 vh = '/projects/snac-data/vh'
+
+vah = '/data/extract/ead_vah_new/vah';
 
 #OCLC sample
 oclc_sample = '/projects/snac-data/sample10k'
@@ -35,4 +37,4 @@ bl = '/lv1/data/extract/britlib'
 viaf = '/db/projects/lcshrecommend/catalogs/SNAC/VIAF/data/'
 
 #Path to the directory where the merged records are created (Create directory)
-merged = '/projects/snac-output/new-run2'
+merged = '/projects/snac-output/update-run0'

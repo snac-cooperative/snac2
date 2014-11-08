@@ -217,8 +217,9 @@ def parseBiogHist(etree_doc):
             biog_data["citation"] = etree.tostring(citation)
         if b_node.find("chronList") is not None:
             biog_data["text"] = []
-            print "WARNING CHRONLIST DETECTED"
-            print etree.tostring(etree_doc)
+            print "CHRONLIST DETECTED"
+            biog_data["chronlist"] = b_node.find("chronList")
+            #print etree.tostring(etree_doc)
             return biog_data
         paragraphs = []
         p_nodes = b_node.findall('p')
