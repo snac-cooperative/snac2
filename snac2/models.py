@@ -1116,7 +1116,10 @@ class MergedRecord(meta.Base, Entity):
                 for text in biogText[concat_text]['text']:
                     cr.write("%s" % text.encode('utf-8')) # do not escape these otherwise the embedded <p> tags will be lost
                 for citation in biogText[concat_text]['citation']:
-                    cr.write("%s" % citation.encode('utf-8')) # do not escape
+                    if citation:
+                        cr.write("%s" % citation.encode('utf-8')) # do not escape
+                    else:
+                        logging.warning("%i : Citation in biogHist was null, and should not be" % self.canonical_id)
             for chronlist_item in chronlists:
                 cr.write("%s" % etree.tostring(chronlist_item[0], encoding='utf-8')) # in lxml, the function is tostring
                 cr.write("%s" %  chronlist_item[1].encode('utf-8'))
@@ -1155,8 +1158,10 @@ class MergedRecord(meta.Base, Entity):
         if maybes:
             for merge_candidate in maybes:
                 #print merge_candidate.record_group.records[0].name.__repr__()
-                cr.write('<cpfRelation xlink:type="simple"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#mayBeSameAs" xlink:href="%s" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s"><relationEntry>%s</relationEntry></cpfRelation>' % (merge_candidate.canonical_id.encode('utf-8'), r_type_t.encode('utf-8'), escape(merge_candidate.record_group.records[0].name).encode('utf-8'))) 
-
+                if (merge_candidate.canonical_id and merge_candidate.record_group.records and merge_candidate.record_group.records[0].name):
+                    cr.write('<cpfRelation xlink:type="simple"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#mayBeSameAs" xlink:href="%s" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s"><relationEntry>%s</relationEntry></cpfRelation>' % (merge_candidate.canonical_id.encode('utf-8'), r_type_t.encode('utf-8'), escape(merge_candidate.record_group.records[0].name).encode('utf-8'))) 
+                else:
+                    raise ValueError("Problem exporting maybe merge candidate %d: missing canonical_id, name.", merge_candidate.id)
         
         #Resource Relations
         for resourceRelation in mresourceRelations:
