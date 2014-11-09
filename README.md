@@ -15,9 +15,10 @@ Once Cheshire and CheshirePy have been built, set up, and installed, and VIAF ha
 	DB_USER = "snac_user"
 	DB_PASS = "snac_password"
 	```
-	* Update `snac2/config/app.py` to include the cheshire config file, log locations, any data directories (those containing EAC-CPF xml files), and merged output directory as follows:  
+	* Update `snac2/config/app.py` to include the cheshire config file, cheshire index name, log locations, any data directories (those containing EAC-CPF xml files), and merged output directory as follows:  
 	```
 	VIAF_CONFIG = "/full/path/to/config.viaf"
+	VIAF_INDEX_NAME = "viaf" # the name of your Cheshire database, aka the text inside the `FILETAG` Cheshire config.
 	log = '/full/path/to/logfile.log'
 	data_shortname = '/full/path/to/data/directory'
 	# any number of shortname = path are allowed
@@ -35,8 +36,6 @@ Once Cheshire and CheshirePy have been built, set up, and installed, and VIAF ha
     	In [1]: 
     ```
 To exit, press `Control+D` and answer the prompt.  If there are no errors, you are ready to run the snac code.
-7. Update the static names in the python code:
-    * Edit `snac2/scripts/match.py` and change the line `viaf.config_cheshire(db="viaf")` so that `db` equals the name of your Cheshire database, aka the text inside the `FILETAG` Cheshire config.
 
 
 Running Match/Merge Code

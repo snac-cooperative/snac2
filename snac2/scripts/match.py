@@ -544,7 +544,7 @@ def match_corp_keyword_viaf(record):
 if __name__ == "__main__":
     db_uri = db_config.get_db_uri()
     models.init_model(db_uri)
-    viaf.config_cheshire(db="viaf")
+    viaf.config_cheshire(db=app_config.VIAF_INDEX_NAME)
     import sys
     import argparse
     parser = argparse.ArgumentParser()

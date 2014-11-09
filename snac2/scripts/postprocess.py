@@ -106,7 +106,7 @@ if __name__ == "__main__":
     import sys
     db_uri = db_config.get_db_uri()
     models.init_model(db_uri)
-    viaf.config_cheshire(db="viaf")
+    viaf.config_cheshire(db=app_config.VIAF_INDEX_NAME)
     start_at_id = 0
     end_at_id = None
     if len(sys.argv) > 2:

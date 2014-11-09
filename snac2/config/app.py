@@ -1,7 +1,7 @@
 DEBUG_ECHO = False
 
 VIAF_CONFIG = "/lv1/home/rlarson/Cheshire_Config/CONFIG.VIAF4"
-
+VIAF_INDEX_NAME = "viaf"
 """
 	Paths to VIAF and EAC repositories
 """
@@ -32,9 +32,6 @@ oclc = '/data/extract/WorldCat'
 
 #British Library
 bl = '/lv1/data/extract/britlib'
-
-#VIAF (Not used. We use Cheshire to index VIAF)
-viaf = '/db/projects/lcshrecommend/catalogs/SNAC/VIAF/data/'
 
 #Path to the directory where the merged records are created (Create directory)
 merged = '/projects/snac-output/update-run0'
