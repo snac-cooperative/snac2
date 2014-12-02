@@ -1048,11 +1048,11 @@ class MergedRecord(meta.Base, Entity):
         places_list = places.items()
         places_list.sort(key=lambda x: x[1],  reverse=True)
         for subject_item in subjects_list:
-            cr.write('<localDescription localType="http://viaf.org/viaf/terms#AssociatedSubject">')
+            cr.write('<localDescription localType="http://socialarchive.iath.virginia.edu/control/term#AssociatedSubject">')
             cr.write('<term>%s</term>' % escape(subject_item[0]).encode('utf-8'))
             cr.write('</localDescription>\n')
         for place_item in places_list:
-            cr.write('<localDescription localType="http://viaf.org/viaf/terms#AssociatedPlace">')
+            cr.write('<localDescription localType="http://socialarchive.iath.virginia.edu/control/term#AssociatedPlace">')
             cr.write('<placeEntry>%s</placeEntry>' % escape(place_item[0]).encode('utf-8'))
             cr.write('</localDescription>\n')
         for item in misc:

@@ -35,3 +35,16 @@ bl = '/lv1/data/extract/britlib'
 
 #Path to the directory where the merged records are created (Create directory)
 merged = '/projects/snac-output/update-run0'
+
+
+aps = '/lv1/data/extract/ead_aps'
+yale = '/lv1/data/extract/ead_yale'
+uil = '/lv1/data/extract/ead_uil'
+afl = '/lv1/data/extract/ead_afl'
+afl_ufl = '/lv1/data/extract/ead_afl-ufl'
+nypl = '/lv1/data/extract/ead_nypl'
+ohlink = '/lv1/data/extract/ead_ohlink'
+aao = '/lv1/data/extract/ead_aao'
+aar = '/lv1/data/extract/ead_aar'
+byu = '/lv1/data/extract/ead_byu'
+rmoa = '/lv1/data/extract/ead_rmoa'

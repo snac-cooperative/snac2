@@ -33,6 +33,7 @@ def load_collection(collection_path, collection_name=''):
                         record = None
                     if record:
                         record.path = filepath
+                        record.collection_id = collection_name
                         record.save()
                         models.commit()
                     else:
@@ -82,3 +83,12 @@ if __name__ == "__main__":
 #    load_collection(app_config.oclc_sample_100k)
 #    load_collection(app_config.oclc)
 #    load_collection(app_config.bl)
+
+#     load_collection(app_config.afl)
+#     load_collection(app_config.afl_ufl)
+#     load_collection(app_config.nypl)
+#     load_collection(app_config.ohlink)
+#     load_collection(app_config.aao)
+#     load_collection(app_config.aar)
+#     load_collection(app_config.byu)
+#     load_collection(app_config.rmoa)

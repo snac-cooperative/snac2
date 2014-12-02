@@ -117,6 +117,9 @@ def prev_dir(name, nest_n=1):
 def extract_year(s):
     return re.findall("\d+", s)
 
+def str_clean(s):
+    return s.strip()
+
 def str_clean_and_lowercase(s):
     """Lower case + strip end white characters"""
     s = s.lower().strip()
@@ -135,6 +138,8 @@ def strip_accents(s):
         s = s.decode('utf-8')
     return ''.join((c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn' ))
 
+def has_n_digits(s, n=2):
+    return re.search(r'\d{%d,}' % (n), s) 
 
 # source from: http://stackoverflow.com/a/93029
 control_chars = ''.join(map(unichr, range(0,32) + range(127,160)))
@@ -163,8 +168,11 @@ def normalize(s):
 def normalize_with_space(s):
     return compress_spaces(strip_accents(str_remove_punc(str_clean_and_lowercase(s), replace_with=" ")))
     
-def normalize_name_without_punc_with_space(s):
-    return compress_spaces(strip_accents(str_remove_punc_and_digits(str_clean_and_lowercase(s), excepting=",", replace_with=" ")))
+def normalize_name_without_punc_with_space(s, lowercase=True):
+    clean = str_clean
+    if lowercase:
+        clean = str_clean_and_lowercase
+    return compress_spaces(strip_accents(str_remove_punc_and_digits(clean(s), excepting=",", replace_with=" ")))
 
 def computeJaroWinklerDistance(x, y):
     if isinstance(x, unicode):

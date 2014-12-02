@@ -58,7 +58,12 @@ def match_persons(batch_size=None, starts_at=None, ends_at=None):
             
         # ngram
         if not record_group and not viaf_id:
-            record_group, viaf_id, viaf_record, match_quality = match_person_ngram_viaf(record)
+            record_group, viaf_id, viaf_record, match_quality = match_person_keyword_viaf(record)
+            if match_quality <= ACCEPT_THRESHOLD:
+                logging.info("keyword only found %s at %.2f, moving on to ngram", viaf_id, match_quality )
+                record_group, viaf_id, viaf_record, match_quality = match_person_ngram_viaf(record)
+            else:
+                logging.info("keyword found %s at %.2f", viaf_id, match_quality )
             if not match_quality:
                 viaf_id = None
                 viaf_record = None
@@ -192,9 +197,9 @@ def match_exact(record, record_type):
     elif record_type == "family":
         group = models.FamilyGroup
     record_group = group.get_by_name(record.name_norm)
-#     if record_type == "corporate" and record_group and len(record.name_norm) > 20:
-#         logging.info("Found exact match using length check: %d %s" % (record_group.id, record.name_norm))
-#         return record_group, record_group.viaf_id, record_group.viaf_record, 1
+    if record_type == "corporate" and record_group and len(record.name_norm) >= 20:
+        logging.info("Found exact match using length check: %d %s" % (record_group.id, record.name_norm))
+        return record_group, record_group.viaf_id, record_group.viaf_record, 1
     if record_group and record_group.viaf_record:
         viafInfo = viaf.getEntityInformation(record_group.viaf_record)
         authority_dates = viafInfo.get('dates')
@@ -231,8 +236,8 @@ def match_exact(record, record_type):
         return None, None, None, 0
         
     
-def match_person_exact(record, force_rematch=False):
-    if not force_rematch:
+def match_person_exact(record, in_db_match=True):
+    if in_db_match:
         record_group = models.PersonGroup.get_by_name(record.name_norm)
         if record_group:
             quality_date_from = DATE_NO_DATA
@@ -243,11 +248,15 @@ def match_person_exact(record, force_rematch=False):
                     quality_date_from = date_from
                 if date_to > quality_date_to:
                     quality_date_to = date_to
-            if len(record.name_norm) > 10 and (quality_date_from > DATE_MATCH_FAIL or quality_date_to > DATE_MATCH_FAIL):
-                logging.info("record_group %d found in database by name for record %d" % (record_group.id, record.id))
+            if (((len(record.name_norm) > 10) and (quality_date_from > DATE_MATCH_FAIL or quality_date_to > DATE_MATCH_FAIL)) or
+                ((len(record_group.name) > 30 or utils.has_n_digits(record_group.name, n=2)) and (quality_date_from != DATE_MATCH_FAIL and quality_date_to != DATE_MATCH_FAIL))
+                ):
+                # if either the name length is greater than 10, and has either a matching date_from or a matching date_to
+                # or if the length is greater than 35, or has at least 2 digits (a year) in the name, and didn't fail quality date checks (but can be empty)
+                logging.info("record_group %d:%s found in database for record %d:%s" % (record_group.id, record_group.name, record.id, record.name_norm))
                 return record_group, record_group.viaf_id, record_group.viaf_record, 1
             else:
-                logging.info("failed existence check record_group %d for record %d" % (record_group.id, record.id))
+                logging.info("failed validation check record_group %d:%s for record %d:%s" % (record_group.id, record_group.name, record.id, record.name_norm))
     is_spirit = False
     if "(spirit)" in record.name.lower():
         is_spirit = True
@@ -294,8 +303,8 @@ def match_person_ngram_viaf(record):
 def compute_name_match_quality(x, y):
     x = re.sub("([\(\[]).*?([\)\]])", "", x)
     y = re.sub("([\(\[]).*?([\)\]])", "", y)
-    x=utils.normalize_name_without_punc_with_space(x)
-    y=utils.normalize_name_without_punc_with_space(y)
+    x=utils.normalize_name_without_punc_with_space(x, lowercase=False)
+    y=utils.normalize_name_without_punc_with_space(y, lowercase=False)
     x = utils.strip_controls(x)
     y = utils.strip_controls(y)
     length = utils.computeJaroWinklerDistance(x, y) # the basic score, without matching any name scrutiny tests
@@ -343,6 +352,9 @@ def compute_name_match_quality(x, y):
                         if query_name.first and match_name.first and query_name.first[0] == match_name.first[0] and len(match_name.middle) > 1 and match_name.middle == query_name.middle:
                             logging.info("name match: %s for %s as middle exact" % (x, y))
                             return 1
+            else:
+                logging.info("last name match fail: %s vs %s" % (match_name.last, query_name.last))
+                return 0
     elif len(match_name) == 1 and len(query_name) == 1:
         # if only single names
         if match_name.first and match_name.first == query_name.first:
@@ -517,8 +529,44 @@ def match_corporate(batch_size=1000):
         record.processed = True
         models.commit()
     return len(records)
-    
-def viaf_match_keyword(record, name_type="person"):
+
+def viaf_match_keyword_person(record):
+    is_spirit = False
+    if "(spirit)" in record.name.lower():
+        is_spirit = True
+    viaf_matches = viaf.query_cheshire_viaf(record.name_norm, index="mainname", name_type="person", is_spirit=is_spirit)
+    viaf_matches = [viaf.getEntityInformation(r) for r in viaf_matches]
+    #possible_matches = []
+    if viaf_matches:
+        viaf_matches = viaf_matches[:10]
+        #logging.info("----")
+        #logging.info("query: %s" % (name.encode('utf-8')))
+        for m in viaf_matches:
+            if m.get('mainHeadings') and len(m['mainHeadings']) > 0:
+                # check existence date
+                quality_from, quality_to = check_existence_dates(record, m['dates'])
+                logging.info("candidate: %s" % (m['mainHeadings']))
+                if quality_to == DATE_MATCH_FAIL or quality_from == DATE_MATCH_FAIL:
+                    logging.info("Failed keyword existence check")
+                    continue
+                elif quality_to == DATE_MATCH_EXACT and quality_from == DATE_MATCH_EXACT and record.name.startswith(m['mainHeadings'][0][:5]):
+                    return m, 1
+                else:
+                    logging.info("passed existence check %d %d" % (quality_from, quality_to))
+                x = utils.strip_accents(m['mainHeadings'][0])
+                y = utils.strip_accents(record.name)
+                name_quality = compute_name_match_quality(x, y)
+                if name_quality >= STR_FUZZY_MATCH_THRESHOLD:
+                    logging.info("accepted as yes or maybe: %s for %s at %0.4f" % (x, y, name_quality))
+                    return m, name_quality
+                    #possible_matches.append((m, name_quality))
+                else:
+                    logging.info("rejected: %s %.4f" % (x, name_quality))
+                
+
+    return viaf.VIAF.get_empty_viaf_dict(), 0
+
+def viaf_match_keyword(record, name_type="corporate"):
     name_norm = record.name_norm
     if name_type == "corporate":
         name_norm = utils.strip_corp_abbrevs(utils.strip_accents(utils.normalize_name_without_punc_with_space(name_norm)))
@@ -540,6 +588,15 @@ def match_corp_keyword_viaf(record):
         return record_group, match['recordId'], match['_raw'], match_quality
     else:
         return None, None, None, -1
+
+def match_person_keyword_viaf(record):
+    match, match_quality = viaf_match_keyword_person(record)
+    if match_quality > 0:
+        record_group = models.RecordGroup.get_by_viaf_id(match['recordId'])
+        return record_group, match['recordId'], match['_raw'], match_quality
+    else:
+        return None, None, None, -1
+    
 
 if __name__ == "__main__":
     db_uri = db_config.get_db_uri()
