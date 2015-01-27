@@ -1122,7 +1122,8 @@ class MergedRecord(meta.Base, Entity):
                         logging.warning("%i : Citation in biogHist was null, and should not be" % self.canonical_id)
             for chronlist_item in chronlists:
                 cr.write("%s" % etree.tostring(chronlist_item[0], encoding='utf-8')) # in lxml, the function is tostring
-                cr.write("%s" %  chronlist_item[1].encode('utf-8'))
+                if (chronlist_item[1]):
+                    cr.write("%s" %  chronlist_item[1].encode('utf-8'))
             cr.write("</biogHist>")
                 #cr.write(biogHist['raw'].encode('utf-8'))
                 #print biogHist['raw'].encode('utf-8')
