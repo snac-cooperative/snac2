@@ -76,6 +76,11 @@ if __name__ == "__main__":
     for c in sys.argv[1:]:
         if c in app_config.__dict__ and isinstance(app_config.__dict__[c], basestring):
             load_collection(app_config.__dict__[c], collection_name=c)
+        else:
+            base_dir = app_config.EAD_BASE_DIR
+            base_dir = base_dir + "/ead_" + c
+            if os.path.isdir(base_dir):
+                load_collection(base_dir, collection_name=c)
 #    load_collection(app_config.vh)
 #    load_collection(app_config.nwda)
 #    load_collection(app_config.loc)

@@ -3,7 +3,7 @@ import sys, string, datetime, cStringIO, uuid, urllib
 import logging
 import xml.dom.minidom
 import lxml.etree as etree
-import os.path
+import os.path, os
 import re
 
 import snac2.config.app as app_config
@@ -30,6 +30,25 @@ def output_all_records_loop(start_at, batch_size=1000, end_at=None):
 def output_updated_records_loop(updated_since):
     merged_records = models.MergedRecord.get_all_new_or_changed_since(imported_at = updated_since, iterate=True)
     write_records(merged_records, record_processed=False)
+    
+def output_updated_records_based_on_directory_loop(dir, start_at=None):
+    ark_ids = []
+    files = os.listdir(dir)
+    if start_at:
+        files = files[start_at:]
+    for f in files:
+        f = f[:-4] # chop fileextension
+        ark_id = noid.ARK_BASE_URI + f.replace("-", "/")
+        ark_ids.append(ark_id)
+    #records = models.MergedRecord.get_all_by_canonical_ids(ark_ids)
+    #print len(records)
+    while ark_ids:
+#    for record_id in ark_ids:
+        record_id = ark_ids[0]
+        merged_record = models.MergedRecord.get_by_canonical_id(record_id)
+        write_records([merged_record], record_processed=False)
+        ark_ids.pop(0) # don't pop before the write, in case something is wrong
+        
     
 def write_records(merged_records, record_processed=True):
     num_written = 0

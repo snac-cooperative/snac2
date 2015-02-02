@@ -2,9 +2,13 @@ DEBUG_ECHO = False
 
 VIAF_CONFIG = "/lv1/home/rlarson/Cheshire_Config/CONFIG.VIAF4"
 VIAF_INDEX_NAME = "viaf"
+
 """
 	Paths to VIAF and EAC repositories
 """
+
+EAD_BASE_DIR = "/lv1/data/extract"
+
 #Log
 log = 'logs/snac.log_20120625.1'
 
@@ -34,7 +38,7 @@ oclc = '/data/extract/WorldCat'
 bl = '/lv1/data/extract/britlib'
 
 #Path to the directory where the merged records are created (Create directory)
-merged = '/projects/snac-output/update-run0'
+merged = '/projects/snac-output/update-run1'
 
 
 aps = '/lv1/data/extract/ead_aps'
@@ -48,3 +52,22 @@ aao = '/lv1/data/extract/ead_aao'
 aar = '/lv1/data/extract/ead_aar'
 byu = '/lv1/data/extract/ead_byu'
 rmoa = '/lv1/data/extract/ead_rmoa'
+
+# Dynamically detected via EAD_BASE_DIR
+# ead_fsga
+# ead_harvard
+# ead_ncsu
+# ead_nwu
+# ead_nysa
+# ead_pacscl
+# ead_pu
+# ead_riamco
+# ead_rutu
+# ead_syru
+# ead_uks
+# ead_umd
+# ead_umi
+# ead_unl
+# ead_utsa
+# ead_utsu
+# ead_uut

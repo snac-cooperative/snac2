@@ -528,6 +528,23 @@ class MergedRecord(meta.Base, Entity):
             return entity
         except NoResultFound:
             return None
+            
+    
+#     @classmethod
+#     def get_all_by_canonical_ids(cls, canonical_ids, options=None, session=None, only_valid=False, iterate=False):
+#         if not session:
+#             session = meta.Session
+#         if not canonical_ids:
+#             return []
+#         q = session.query(cls)
+#         if options:
+#             q = q.options(*options)
+#         q = q.filter(cls.canonical_id.in_(canonical_ids))
+#         if only_valid:
+#             q = q.filter(cls.valid == True)
+#         if iterate:
+#             return q
+#         return q.all()
 
 
     @classmethod
@@ -671,6 +688,7 @@ class MergedRecord(meta.Base, Entity):
             q = q.limit(limit)
         if offset:
             q = q.offset(offset)
+        q = q.distinct()
         if iterate:
             return q
         return q.all()
@@ -790,7 +808,7 @@ class MergedRecord(meta.Base, Entity):
                             logging.warning("Warning %s has no record_group" % (extracted_record_id))
                             relation.setAttribute("xlink:href", "")
                             continue
-                        merge_records = self.record_group.merge_records
+                        merge_records = record_group.merge_records
                         if not merge_records:
                             logging.warning("Warning %s has no merge record" % (extracted_record_id))
                             relation.setAttribute("xlink:href", "")
@@ -805,6 +823,7 @@ class MergedRecord(meta.Base, Entity):
                                 #logging.info( "%s recorded" % (record.canonical_id) )
                             if record.valid:
                                 if record.canonical_id:
+                                    
                                     relation.setAttribute("xlink:href", record.canonical_id)
                                 else:
                                     logging.warning( "Warning %s has no ARK ID" % (extracted_record_id) )
@@ -824,7 +843,7 @@ class MergedRecord(meta.Base, Entity):
             if resourceRelations != None:
                 mresourceRelations.extend(resourceRelations)
             
-            biography = snac2.cpf.parseBiogHist(etree_doc)
+            biography = snac2.cpf.parseBiogHist2(etree_doc)
             if biography != None:
                 mbiography.append(biography)
             
@@ -1093,40 +1112,61 @@ class MergedRecord(meta.Base, Entity):
 
         #BiogHist
         biogText = {}
-        chronlists = []
+        biogData = []
+        #chronlists = []
         for biogHist in mbiography:
-            # de-duplicate
-            text = biogHist.get('text')
-            citation = biogHist.get('citation')
-            if not text:
-                # this is a chronList item
-                # logging.warning("chronlist unprocessed on %s" %(canonical_id))
-                chronlist = biogHist.get("chronlist")
-                if chronlist is not None:
-                    chronlists.append((biogHist["chronlist"], citation))
-            else:
-                concat_text = "\n".join(text)
-                if concat_text in biogText:
-                    biogText[concat_text]['citation'].append(citation)
+            if biogHist.get('citation') and biogHist.get('text'):
+                text = biogHist['text']
+                citation = biogHist['citation']
+                if text in biogText:
+                    biogText[text]['citation'].append(citation)
                 else:
-                    biogText[concat_text] = {'text':text, 'citation':[citation]}
-        if biogText or chronlists:
+                    biogText[text] = {'text':text, 'citation':[citation]}
+            elif biogHist.get('data'):
+                biogData.append(biogHist['data'])
+        if biogText or biogData:
             cr.write("<biogHist>")
-            for concat_text in biogText.keys():
-                for text in biogText[concat_text]['text']:
-                    cr.write("%s" % text.encode('utf-8')) # do not escape these otherwise the embedded <p> tags will be lost
-                for citation in biogText[concat_text]['citation']:
+            for text in biogText.keys():
+                cr.write("%s" % text.encode('utf-8'))
+                for citation in biogText[text]['citation']:
                     if citation:
                         cr.write("%s" % citation.encode('utf-8')) # do not escape
-                    else:
-                        logging.warning("%i : Citation in biogHist was null, and should not be" % self.canonical_id)
-            for chronlist_item in chronlists:
-                cr.write("%s" % etree.tostring(chronlist_item[0], encoding='utf-8')) # in lxml, the function is tostring
-                cr.write("%s" %  chronlist_item[1].encode('utf-8'))
+            for data in biogData:
+                cr.write("%s" % data.encode('utf-8'))
             cr.write("</biogHist>")
-                #cr.write(biogHist['raw'].encode('utf-8'))
-                #print biogHist['raw'].encode('utf-8')
-                #cr.write("<biogHist>"+escape(biogHist).encode('utf-8')+"</biogHist>")
+        # 
+#             # de-duplicate
+#             text = biogHist.get('text')
+#             citation = biogHist.get('citation')
+#             if not text:
+#                 # this is a chronList item
+#                 # logging.warning("chronlist unprocessed on %s" %(canonical_id))
+#                 chronlist = biogHist.get("chronlist")
+#                 if chronlist is not None:
+#                     chronlists.append((biogHist["chronlist"], citation))
+#             else:
+#                 concat_text = "\n".join(text)
+#                 if concat_text in biogText:
+#                     biogText[concat_text]['citation'].append(citation)
+#                 else:
+#                     biogText[concat_text] = {'text':text, 'citation':[citation]}
+#         if biogText or chronlists:
+#             cr.write("<biogHist>")
+#             for concat_text in biogText.keys():
+#                 for text in biogText[concat_text]['text']:
+#                     cr.write("%s" % text.encode('utf-8')) # do not escape these otherwise the embedded <p> tags will be lost
+#                 for citation in biogText[concat_text]['citation']:
+#                     if citation:
+#                         cr.write("%s" % citation.encode('utf-8')) # do not escape
+#                     else:
+#                         logging.warning("%i : Citation in biogHist was null, and should not be" % self.canonical_id)
+#             for chronlist_item in chronlists:
+#                 cr.write("%s" % etree.tostring(chronlist_item[0], encoding='utf-8')) # in lxml, the function is tostring
+#                 cr.write("%s" %  chronlist_item[1].encode('utf-8'))
+#             cr.write("</biogHist>")
+#                 #cr.write(biogHist['raw'].encode('utf-8'))
+#                 #print biogHist['raw'].encode('utf-8')
+#                 #cr.write("<biogHist>"+escape(biogHist).encode('utf-8')+"</biogHist>")
     
         #END Description
         cr.write("</description>")
