@@ -101,7 +101,7 @@ def parseExistDates(doc):
         existDates = doc.getElementsByTagName("existDates")
         return existDates
     except:
-        logging.info("ERROR: Unable to extract exist dates from %s" %eac)
+        logging.info("ERROR: Unable to extract exist dates from %s" % doc)
 
 #Parse Occupations
 def parseOccupations(doc):
@@ -117,7 +117,7 @@ def parseOccupations(doc):
                 return [occupationNode[0]]
 
     except:
-        logging.info("ERROR: Unable to extract occupations from %s" %eac)
+        logging.info("ERROR: Unable to extract occupations from %s" % doc)
         
 #Parse LocalDescriptions
 def parseLocalDescriptions(doc):
@@ -131,7 +131,21 @@ def parseLocalDescriptions(doc):
             if len(localDescNode) > 0:
                 return [localDescNode[0]]
     except:
-       logging.info("ERROR: Unable to extract local descriptions from %s" %eac)
+    	logging.info("ERROR: Unable to extract local descriptions from %s" % doc)
+       
+#Parse LocalDescriptions
+def parsePlaces(doc):
+    
+    try:
+        placeNodes = doc.getElementsByTagName("place")
+        if len(placeNodes) > 0:
+            return placeNodes
+        else:
+        	return []
+    except Exception, e:
+    	raise e
+    	logging.info("ERROR: Unable to extract local descriptions from %s" % doc)
+    	return []
 
 #Parse sources
 def parseSources(doc):
@@ -147,7 +161,7 @@ def parseSources(doc):
                 return [source[0]]
         
     except:
-        logging.info("ERROR: Unable to extract sources from %s" %eac)
+        logging.info("ERROR: Unable to extract sources from %s" % doc)
 
 #Parse associations for a eac record, return the raw xml
 def parseAssociationsRaw(doc):
@@ -161,7 +175,7 @@ def parseAssociationsRaw(doc):
         else:
             return None
     except Exception, e:
-        logging.info("ERROR: Unable to extract association information from %s" %eac)
+        logging.info("ERROR: Unable to extract association information from %s" % doc)
         return None
      
 
@@ -177,7 +191,7 @@ def parseResourceAssociationsRaw(doc):
     else:
         return None
 #     except Exception, e:
-#         logging.info("ERROR: Unable to extract resource association information from %s" %eac)
+#         logging.info("ERROR: Unable to extract resource association information from %s" % doc)
 #         return None
 
 
@@ -198,7 +212,7 @@ def parseAssociations(doc):
         else:
             return None
     except:
-        logging.info("ERROR: Unable to extract association information from %s" %eac)
+        logging.info("ERROR: Unable to extract association information from %s" % doc)
         return None
 
 def content(tag):
@@ -233,7 +247,6 @@ def parseBiogHist(etree_doc):
         
 def parseBiogHist2(etree_doc):
     doc = etree_doc
-    doc = utils.strip_xml_ns(doc)
     bioghist = doc.xpath("//*[local-name() = 'biogHist']")
     if len(bioghist) > 0:
         b_node = bioghist[0]

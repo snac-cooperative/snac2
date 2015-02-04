@@ -755,6 +755,8 @@ class MergedRecord(meta.Base, Entity):
     
         #function
         mfunctions = []
+        
+        mplaces = []
     
         relations_canonical_idx = {}
         for cpfRecord in cpfRecords:
@@ -788,6 +790,9 @@ class MergedRecord(meta.Base, Entity):
             localDescriptions = snac2.cpf.parseLocalDescriptions(legacyDoc)
             if localDescriptions != None:
                 mlocalDescriptions.extend(localDescriptions)
+            
+            places = snac2.cpf.parsePlaces(legacyDoc)
+            mplaces.extend(places)
             
             functions = snac2.cpf.parseFunctions(legacyDoc)
             if functions:
@@ -1041,7 +1046,8 @@ class MergedRecord(meta.Base, Entity):
     
         #Local Descriptions
         subjects = {}
-        places = {}
+        places = {} # placeEntry from <place> tags 
+        desc_places = {} # placeEntry from <localDescription> tags; think this is obsolete
         misc = []
     
         num_and_spaces_re = re.compile(r"^[0-9 -]+$")
@@ -1056,24 +1062,28 @@ class MergedRecord(meta.Base, Entity):
                 else:
                     subjects[subject] = subjects.get(subject, 0) + 1
             elif localType == "http://socialarchive.iath.virginia.edu/control/term#AssociatedPlace":
+            	# TODO: I think this is no longer used after <place> was introduced, but left here for historical reasons -yl
                 place = snac2.cpf.extract_subelement_content_from_entry(localDescription, "placeEntry")
-                places[place] = places.get(place, 0) + 1
+                desc_places[place] = desc_places.get(place, 0) + 1
             else:
                 misc.append(localDescription)
                     #cr.write(localDescription.toxml().encode('utf-8'))
-
+		
         subjects_list = subjects.items()
         subjects_list.sort(key=lambda x: x[1], reverse=True)
-        places_list = places.items()
-        places_list.sort(key=lambda x: x[1],  reverse=True)
+        desc_places_list = desc_places.items()
+        desc_places_list.sort(key=lambda x: x[1],  reverse=True)
         for subject_item in subjects_list:
             cr.write('<localDescription localType="http://socialarchive.iath.virginia.edu/control/term#AssociatedSubject">')
             cr.write('<term>%s</term>' % escape(subject_item[0]).encode('utf-8'))
             cr.write('</localDescription>\n')
-        for place_item in places_list:
+        for place_item in desc_places_list:
             cr.write('<localDescription localType="http://socialarchive.iath.virginia.edu/control/term#AssociatedPlace">')
             cr.write('<placeEntry>%s</placeEntry>' % escape(place_item[0]).encode('utf-8'))
             cr.write('</localDescription>\n')
+        for place in mplaces:
+        	cr.write(place.toxml().encode('utf-8'))
+        	cr.write("\n")
         for item in misc:
             cr.write(item.toxml().encode('utf-8'))
         

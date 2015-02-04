@@ -479,7 +479,7 @@ def match_families(batch_size=1000):
             record_group.save()
             models.flush()
             
-        if record.id not in [r.id for r in record.record_group.records]:
+        if record.id not in [r.id for r in record_group.records]:
             record = models.FamilyOriginalRecord.get_by_id(record.id)
             record.record_group_id = record_group.id
                         

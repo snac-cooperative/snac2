@@ -46,6 +46,7 @@ Now you are ready to run the code.
 * Loading Data
 	* Refer to the `snac2/config/app.py` file for the `data_shortname` variables set above.
 	* Load data into the database using `python snac2/scripts/load.py data_shortname`.  This will read through the EAC-CPF records and import them into the database.
+        * Alternatively, if the target to be loaded is located within EAD_BASE_DIR and has the naming convention ead_<short_name>, you can load it directly without using a data_shortname, via load.py <short_name>
 * Matching Data to VIAF
 	* Matching is performed using the command `python snac2/scripts/match.py` with the following arguments:
 		* Type arguments: `-p` for Persons, `-c` for Corporate Bodies, or `-f` for Families.  Note: only one at a time should be used.
