@@ -717,7 +717,7 @@ class MergedRecord(meta.Base, Entity):
         # TODO: still need to rewrite this to use a real parser instead of writing out strings.
         # TODO: and get rid of freaking minidom
         cpfRecords = [record.path for record in self.record_group.records]
-        viafInfo = snac2.viaf.VIAF.get_empty_viaf_dict()
+        viaf_info = snac2.viaf.VIAF.get_empty_viaf_dict()
         if self.record_group.viaf_record:
             viaf_info = snac2.viaf.getEntityInformation(self.record_group.viaf_record)
         r_type = self.r_type
@@ -878,7 +878,7 @@ class MergedRecord(meta.Base, Entity):
         
         #VIAF
         #1. From VIAF, add to eac-cpf/control after recordId
-        viafRecordId = viafInfo['recordId']
+        viafRecordId = viaf_info['recordId']
         if viafRecordId != None:
             cr.write('<otherRecordId localType="http://viaf.org/viaf/terms#viafID">')
             cr.write('%s' %viafRecordId)
@@ -958,7 +958,7 @@ class MergedRecord(meta.Base, Entity):
         cpf_names = {}
         for k, val in enumerate(mnames):
             cpf_names[k] = val
-        names = merge_name_entries(viafInfo['authForms'], viafInfo['altForms'], cpf_names)
+        names = merge_name_entries(viaf_info['authForms'], viaf_info['altForms'], cpf_names)
         name_tuples = names.items()
         name_tuples.sort(key=lambda x: x[1].preferenceScore, reverse=True)
         authorized_sources = set(["lc", "lac", "nla", 'oac'])
@@ -996,7 +996,7 @@ class MergedRecord(meta.Base, Entity):
         
         #Exist Dates
     
-        existDate = viafInfo['dates']
+        existDate = viaf_info['dates']
         if existDate != None and (existDate[0] !='0' or existDate[1] != '0'):
             cr.write("<existDates>")
             cr.write("<dateRange>")
@@ -1088,7 +1088,7 @@ class MergedRecord(meta.Base, Entity):
             cr.write(item.toxml().encode('utf-8'))
         
         #Nationality from VIAF
-        entityNationality = viafInfo['nationality']
+        entityNationality = viaf_info['nationality']
         for nationality in set(entityNationality):
             cr.write('<localDescription localType="http://viaf.org/viaf/terms#nationalityOfEntity">')
             if not nationality.isupper() or not nationality.isalpha():
@@ -1098,14 +1098,14 @@ class MergedRecord(meta.Base, Entity):
             cr.write('</localDescription>')
         
         #Gender from VIAF
-        gender = viafInfo['gender']
+        gender = viaf_info['gender']
         if gender != None:
             cr.write('<localDescription localType="http://viaf.org/viaf/terms#gender">')
             cr.write('<term>%s</term>' %gender)
             cr.write('</localDescription>')
         
         #Languages used from VIAF - should add script
-        entityLanguages = viafInfo['language']
+        entityLanguages = viaf_info['language']
         for language in set(entityLanguages):
             cr.write('<languageUsed>')
             cr.write('<language languageCode="%s"/>' % escape(language.lower()).encode('utf-8'))
@@ -1191,12 +1191,12 @@ class MergedRecord(meta.Base, Entity):
         
         if r_type == "person" or r_type == "corporateBody":
             r_type_t = r_type.capitalize()
-            headings = viafInfo['mainHeadings']
+            headings = viaf_info['mainHeadings']
             if headings:
                 cr.write('<cpfRelation xlink:type="simple" xlink:href="http://viaf.org/viaf/%s"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#sameAs" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s">' % (viafRecordId, r_type_t)) 
                 cr.write("<relationEntry>%s</relationEntry>" % (escape(headings[0]).encode('utf-8')))
                 cr.write("</cpfRelation>")
-            headingsEl = viafInfo['mainElementEl']
+            headingsEl = viaf_info['mainElementEl']
             if headingsEl:
                 for h in headingsEl:
                     if h["source"] == "LC":
@@ -1218,7 +1218,7 @@ class MergedRecord(meta.Base, Entity):
             cr.write(resourceRelation.toxml().encode('utf-8'))
         
         #Titles from VIAF
-        for title in viafInfo['titles']:
+        for title in viaf_info['titles']:
             cr.write('<resourceRelation xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#creatorOf" xlink:role="http://socialarchive.iath.virginia.edu/control/term#BibliographicResource" xlink:type="simple">')
             cr.write('<relationEntry>')
             title = title.replace("&", "&amp;").replace("<", "&lt;")
