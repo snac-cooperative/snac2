@@ -506,6 +506,7 @@ class MergedRecord(meta.Base, Entity):
     created_at = Column(DateTime(), nullable=False, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime(), nullable=False, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, index=True)
     invalidates = orm.relationship("MergedRecord", backref=orm.backref("invalidated_by"), foreign_keys=[invalidates_record_id], remote_side=[id], uselist=False)
+    last_output_at = Column(DateTime(), nullable=True, index=True)
 
     __mapper_args__ = {
         'polymorphic_on':r_type
@@ -761,7 +762,15 @@ class MergedRecord(meta.Base, Entity):
         relations_canonical_idx = {}
         for cpfRecord in cpfRecords:
             legacyDoc = xml.dom.minidom.parse(cpfRecord)
-            etree_doc = etree.XML(open(cpfRecord).read())
+            try:
+                etree_doc = etree.XML(open(cpfRecord).read())
+            except etree.XMLSyntaxError, e:
+                p = etree.XMLParser(huge_tree=True) # retry the parse with a huge_tree
+                etree_doc = etree.parse(cpfRecord, parser=p)
+                logging.warning("WARNING having trouble with %s, falling back to huge_tree parser" % (cpfRecord))
+            except Exception, e:
+                logging.error("ERROR failed to parse %s" % (cpfRecord))
+                raise e
             identityInfo = snac2.cpf.parseIdentity(legacyDoc)
             if identityInfo != None:
                 recordIds = identityInfo['id']

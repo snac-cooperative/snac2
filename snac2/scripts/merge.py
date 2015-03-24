@@ -27,9 +27,9 @@ def output_all_records_loop(start_at, batch_size=1000, end_at=None):
             # merged_records returns an iterator, which is always true.  need to check if the inner for loop ran at all to see if the loop should end
             break
 
-def output_updated_records_loop(updated_since):
-    merged_records = models.MergedRecord.get_all_new_or_changed_since(imported_at = updated_since, iterate=True)
-    write_records(merged_records, record_processed=False)
+def output_updated_records_loop(updated_since, limit=None, offset=None):
+    merged_records = models.MergedRecord.get_all_new_or_changed_since(imported_at = updated_since, iterate=True, limit=limit, offset=offset)
+    write_records(merged_records, record_processed=True)
     
 def output_updated_records_based_on_directory_loop(dir, start_at=None):
     ark_ids = []
@@ -46,7 +46,7 @@ def output_updated_records_based_on_directory_loop(dir, start_at=None):
 #    for record_id in ark_ids:
         record_id = ark_ids[0]
         merged_record = models.MergedRecord.get_by_canonical_id(record_id)
-        write_records([merged_record], record_processed=False)
+        write_records([merged_record], record_processed=True)
         ark_ids.pop(0) # don't pop before the write, in case something is wrong
         
     
@@ -67,9 +67,10 @@ def write_records(merged_records, record_processed=True):
         wf.write(doc.toxml(encoding="utf-8"))
         wf.flush()
         wf.close()
-        logging.info("%d: %s" %(record.id, full_fname))
+        logging.info("%d: %s (num_written: %d)" %(record.id, full_fname, num_written))
         if record_processed:
-            record.processed = True
+            #record.processed = True
+            record.last_output_at = datetime.datetime.now()
             models.commit()
     return num_written
 

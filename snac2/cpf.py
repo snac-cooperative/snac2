@@ -105,7 +105,13 @@ def parseExistDates(doc):
 
 #Parse Occupations
 def parseOccupations(doc):
-    
+    doc = doc.getElementsByTagName("cpfDescription")
+    if not doc:
+        return []
+    doc = doc[0].getElementsByTagName("description")
+    if not doc:
+        return []
+    doc = doc[0]
     try:
         
         occupationsNode = doc.getElementsByTagName("occupations")
@@ -133,9 +139,15 @@ def parseLocalDescriptions(doc):
     except:
     	logging.info("ERROR: Unable to extract local descriptions from %s" % doc)
        
-#Parse LocalDescriptions
+#Parse places
 def parsePlaces(doc):
-    
+    doc = doc.getElementsByTagName("cpfDescription")
+    if not doc:
+        return []
+    doc = doc[0].getElementsByTagName("description")
+    if not doc:
+        return []
+    doc = doc[0]
     try:
         placeNodes = doc.getElementsByTagName("place")
         if len(placeNodes) > 0:
@@ -144,7 +156,7 @@ def parsePlaces(doc):
         	return []
     except Exception, e:
     	raise e
-    	logging.info("ERROR: Unable to extract local descriptions from %s" % doc)
+    	logging.info("ERROR: Unable to extract places from %s" % doc)
     	return []
 
 #Parse sources
