@@ -4,6 +4,7 @@ import snac2.config.app as app_config
 import snac2.config.db as db_config
 import snac2.models as models
 import os, logging, os.path, re
+import traceback
 
 logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d %I:%M:%S %p', level=logging.INFO)
 
@@ -44,6 +45,7 @@ def load_collection(collection_path, collection_name=''):
                 n += 1
         except Exception, e:
             logging.warning("%s: error parsing %s %s" %(collection_path, f, e))
+            logging.warning(traceback.format_exc())
             raise e
     logging.info("%d total loaded in %s", n, collection_path)
     if fail_n > 0:
@@ -57,13 +59,18 @@ def is_oac_malformed_name(name):
     
 def is_super_long(name, filepath):
     if name and len(name) >= 500:
-        logging.warning("%s | %s is probably invalid", name, filepath)
+        logging.warning("%s | %s is probably invalid; ignore", name, filepath)
         return True
     elif name and len(name) >= 300:
-        logging.warning("%s | %s is way too long and probably not a real name", name, filepath)
+        logging.warning("%s | %s is way too long and probably not a real name; ignore", name, filepath)
         return True
     elif name and len(name) >= 200:
-        logging.warning("%s | %s is long and may not be a real name", name, filepath)
+        if name.count(",") > 8 or name.count(";") > 5:
+            logging.warning("%s | %s is long and has too many commas and semicolons; probably not a real name; ignore", name, filepath)
+            return True
+        else:
+            logging.warning("%s | %s is long and may not be a real name", name, filepath)
+            return False
     return False
     
 if __name__ == "__main__":
@@ -78,9 +85,13 @@ if __name__ == "__main__":
             load_collection(app_config.__dict__[c], collection_name=c)
         else:
             base_dir = app_config.EAD_BASE_DIR
-            base_dir = base_dir + "/ead_" + c
-            if os.path.isdir(base_dir):
-                load_collection(base_dir, collection_name=c)
+            target_dir = base_dir + "/" + c
+#           if not os.path.isdir(target_dir):
+#                 target_dir = base_dir + "/ead_" + c
+            if os.path.isdir(target_dir):
+                load_collection(target_dir, collection_name=c)
+            else:
+                logging.error("Specified collection does not exist in %s" % (app_config.EAD_BASE_DIR))
 #    load_collection(app_config.vh)
 #    load_collection(app_config.nwda)
 #    load_collection(app_config.loc)

@@ -230,32 +230,32 @@ def parseAssociations(doc):
 def content(tag):
     return tag.text + ''.join(etree.tostring(e) for e in tag)
                                                
-#Parse the bioghist field from a eac record
-def parseBiogHist(etree_doc):
-    doc = etree_doc
-    doc = utils.strip_xml_ns(doc)
-    bioghist = doc.xpath("//*[local-name() = 'biogHist']")
-    if len(bioghist) > 0:
-        b_node = bioghist[0]
-        biog_data = {"raw":etree.tostring(b_node)}
-        citation = b_node.find("citation")
-        if citation is not None:
-            biog_data["citation"] = etree.tostring(citation)
-        if b_node.find("chronList") is not None:
-            biog_data["text"] = []
-            print "CHRONLIST DETECTED"
-            biog_data["chronlist"] = b_node.find("chronList")
-            #print etree.tostring(etree_doc)
-            return biog_data
-        paragraphs = []
-        p_nodes = b_node.findall('p')
-        if p_nodes:
-            for n in p_nodes:
-                paragraphs.append(etree.tostring(n))
-            biog_data["text"] = paragraphs
-        return biog_data
-    else:
-        return None
+# #Parse the bioghist field from a eac record
+# def parseBiogHist(etree_doc):
+#     doc = etree_doc
+#     doc = utils.strip_xml_ns(doc)
+#     bioghist = doc.xpath("//*[local-name() = 'biogHist']")
+#     if len(bioghist) > 0:
+#         b_node = bioghist[0]
+#         biog_data = {"raw":etree.tostring(b_node)}
+#         citation = b_node.find("citation")
+#         if citation is not None:
+#             biog_data["citation"] = etree.tostring(citation)
+#         if b_node.find("chronList") is not None:
+#             biog_data["text"] = []
+#             print "CHRONLIST DETECTED"
+#             biog_data["chronlist"] = b_node.find("chronList")
+#             #print etree.tostring(etree_doc)
+#             return biog_data
+#         paragraphs = []
+#         p_nodes = b_node.findall('p')
+#         if p_nodes:
+#             for n in p_nodes:
+#                 paragraphs.append(etree.tostring(n))
+#             biog_data["text"] = paragraphs
+#         return biog_data
+#     else:
+#         return None
         
 def parseBiogHist2(etree_doc):
     doc = etree_doc
@@ -266,9 +266,14 @@ def parseBiogHist2(etree_doc):
         #biog_data = {"raw":etree.tostring(b_node)}
         biog_children = b_node.getchildren()
         if len(biog_children) <= 2: # a <p> and a <citation>
-            p_node = b_node.find('p')
-            citation = b_node.find("citation")
-            if citation is not None:
+            #print "a:", etree.tostring(b_node)
+            p_node = b_node.xpath("./*[local-name() = 'p']")
+            p_node = p_node[0] if p_node else None
+            #print "p:", etree.tostring(p_node)
+            citation = b_node.xpath("./*[local-name() = 'citation']")
+            citation = citation[0] if citation else None
+            #print "c:", etree.tostring(citation)
+            if citation is not None and p_node is not None:
                 biog_data['citation'] = etree.tostring(citation)
                 biog_data['text'] = etree.tostring(p_node)
                 return biog_data # short-circuit this now

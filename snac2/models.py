@@ -62,6 +62,10 @@ def flush(session=None):
     except Exception, e:
         session.rollback()
         raise e
+        
+
+def extractNodeValue(xmlNodeList):
+    return xmlNodeList[0].childNodes[0].nodeValue if len(xmlNodeList) > 0 and len(xmlNodeList[0].childNodes) > 0 else None
 
 
 class Entity(object):
@@ -203,9 +207,9 @@ class OriginalRecord(meta.Base, Entity):
     path = Column(types.Unicode(255), nullable=True, index=True)
     r_type = Column(types.Unicode(64), nullable=False, index=True)
     from_date = Column(Date(), nullable=True)
-    from_date_type = Column(types.Unicode(64), nullable=True, index=True)
+    from_date_type = Column(types.Unicode(255), nullable=True, index=True)
     to_date = Column(Date(), nullable=True)
-    to_date_type = Column(types.Unicode(64), nullable=True, index=True)
+    to_date_type = Column(types.Unicode(255), nullable=True, index=True)
     processed = Column(types.Boolean, nullable=False, index=True, server_default="false")
     record_data = orm.deferred(Column(types.UnicodeText, nullable=True))
     created_at = Column(DateTime(), nullable=False, default=datetime.datetime.utcnow)
@@ -218,7 +222,7 @@ class OriginalRecord(meta.Base, Entity):
     }
     
     def __repr__(self):
-        return "<OriginalRecord %d %s>" % (self.id, self.name.encode('utf-8'))
+        return "<OriginalRecord %s %s>" % (str(self.id), self.name.encode('utf-8'))
     
     @classmethod
     def load_from_eac(cls, eac_text):
@@ -261,18 +265,33 @@ class OriginalRecord(meta.Base, Entity):
         to_date_type = None
         for existDate in existDates:
             fromDateElement = existDate.getElementsByTagName("fromDate")
-            toDateElement = existDate.getElementsByTagName("toDate")           
-            if fromDateElement and len(fromDateElement[0].attributes):
-                fromDate = fromDateElement[0].attributes["standardDate"].value
-                fromDate = dateutil.parser.parse(fromDate, default=datetime.date(1, 1, 1)) # default if out of bound
-                from_date_type = fromDateElement[0].attributes["localType"].value
-            if toDateElement and len(toDateElement[0].attributes):
-                toDate = toDateElement[0].attributes["standardDate"].value
-                toDate = dateutil.parser.parse(toDate, default=datetime.date(1, 12, 31)) # default if out of bound
-                to_date_type = toDateElement[0].attributes["localType"].value
-            
+            toDateElement = existDate.getElementsByTagName("toDate")
+            genericDateElement = existDate.getElementsByTagName("date")
+            fromDate, from_date_type = cls._process_date_element(fromDateElement, default_base=datetime.date(1, 1, 1))
+            toDate, to_date_type = cls._process_date_element(toDateElement, default_base=datetime.date(1, 12, 31))
+            if genericDateElement and (not fromDate and not toDate):
+                fromDate, from_date_type = cls._process_date_element(genericDateElement)
         return record_class(name=names[0], name_norm=utils.normalize_with_space(names[0]), source_id=entityId, from_date=fromDate, from_date_type=from_date_type, to_date=toDate, to_date_type=to_date_type)#, record_data=eac_text)
 
+    @classmethod
+    def _process_date_element(cls, element, default_base=None):
+        d_type = None
+        d = None
+        if element and len(element[0].attributes):
+            if element[0].attributes.get("localType"):
+                d_type = element[0].attributes["localType"].value
+            if element[0].attributes.get("standardDate"):
+                d = element[0].attributes["standardDate"].value
+            else:
+                d = extractNodeValue(element)
+                if d.startswith("active "):
+                    d = d[7:]
+            try:
+                d = dateutil.parser.parse(d, default=default_base)
+            except ValueError:
+                d = None
+        return d, d_type
+    
     @classmethod
     def get_all_unprocessed_records(cls, options=None, session=None, limit=None, min_id=None, max_id=None):
         if not session:
@@ -694,9 +713,35 @@ class MergedRecord(meta.Base, Entity):
             return q
         return q.all()
         
+    @classmethod
+    def get_all_for_collection_ids(cls, collection_ids, options=None, session=None, iterate=False, limit=None, offset=None):
+        if not session:
+            session = meta.Session
+        q = session.query(cls)
+        if options:
+            q = q.options(*options)
+        # TODO: this is potentially a costly query
+        q = session.query(cls)
+        q = q.join(cls.record_group)
+        q = q.join(OriginalRecord, RecordGroup.id ==OriginalRecord.record_group_id)
+        q = q.filter(OriginalRecord.record_group_id != None)
+        or_clause = []
+        for collection_id in collection_ids:
+            or_clause.append(OriginalRecord.collection_id == collection_id)    
+        #q = q.filter(OriginalRecord.collection_id.in_(collection_ids))
+        q = q.filter(or_(*or_clause))
+        q = q.order_by(cls.created_at.asc())
+        if limit:
+            q = q.limit(limit)
+        if offset:
+            q = q.offset(offset)
+        q = q.distinct()
+        if iterate:
+            return q
+        return q.all()
     
     def to_cpf(self):
-        logging.info("creating output for %d" % (self.record_group.id))
+        logging.info("creating output for %d: %s" % (self.record_group.id, self.canonical_id))
         if self.valid:
             combined_record = self.create_combined_record()
         else:
@@ -815,6 +860,10 @@ class MergedRecord(meta.Base, Entity):
                     extracted_records = relation.getElementsByTagName("span")
                     extracted_records = extracted_records[0]
                     extracted_record_id = extracted_records.childNodes[0].nodeValue
+                    extracted_record_id = extracted_record_id.strip()
+                    #print "EXTRACTED SOURCE ID %s from %s" % (extracted_record_id, cpfRecord)
+                    if extracted_record_id.startswith("recordId: "):
+                        extracted_record_id = extracted_record_id[len("recordId: "):] # correct for extraneous henry_cpf prefixes
                     original_record = OriginalRecord.get_by_source_id(extracted_record_id)
                     if original_record:
                         record_group = original_record.record_group
@@ -1038,17 +1087,20 @@ class MergedRecord(meta.Base, Entity):
             
     
         # functions
-    
         function_terms = {}
         for function in mfunctions:
-            term = snac2.cpf.extract_subelement_content_from_entry(function, "term")
-            localType = function.attributes.get("localType")
-            if localType:
-                localType = localType.value
-            if term not in function_terms:
-                function_terms[term] = (function, localType)
-            elif function_terms[term][1] != None and not localType:
-                function_terms[term] = (function, localType)
+            if function.getElementsByTagName("term"):
+                term = snac2.cpf.extract_subelement_content_from_entry(function, "term")
+                localType = function.attributes.get("localType")
+                if localType:
+                    localType = localType.value
+                if term not in function_terms:
+                    function_terms[term] = (function, localType)
+                elif function_terms[term][1] != None and not localType:
+                    function_terms[term] = (function, localType)
+            else:
+                # just passthrough since we're not uniquefying
+                cr.write(function.toxml().encode('utf-8'))
         function_terms_items = function_terms.items()
         for item in function_terms_items:    
             cr.write(item[1][0].toxml().encode('utf-8'))
@@ -1143,6 +1195,8 @@ class MergedRecord(meta.Base, Entity):
                     biogText[text] = {'text':text, 'citation':[citation]}
             elif biogHist.get('data'):
                 biogData.append(biogHist['data'])
+        #print mbiography
+        #print biogText
         if biogText or biogData:
             cr.write("<biogHist>")
             for text in biogText.keys():

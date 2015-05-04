@@ -29,7 +29,11 @@ def output_all_records_loop(start_at, batch_size=1000, end_at=None):
 
 def output_updated_records_loop(updated_since, limit=None, offset=None):
     merged_records = models.MergedRecord.get_all_new_or_changed_since(imported_at = updated_since, iterate=True, limit=limit, offset=offset)
-    write_records(merged_records, record_processed=True)
+    write_records(merged_records, record_processed=False, offset=offset)
+    
+def output_updated_records_by_collection_id_loop(collection_ids, limit=None, offset=None):
+    merged_records = models.MergedRecord.get_all_for_collection_ids(collection_ids, iterate=True, limit=limit, offset=offset)
+    write_records(merged_records, record_processed=False, offset=offset)
     
 def output_updated_records_based_on_directory_loop(dir, start_at=None):
     ark_ids = []
@@ -46,12 +50,12 @@ def output_updated_records_based_on_directory_loop(dir, start_at=None):
 #    for record_id in ark_ids:
         record_id = ark_ids[0]
         merged_record = models.MergedRecord.get_by_canonical_id(record_id)
-        write_records([merged_record], record_processed=True)
+        write_records([merged_record], record_processed=False)
         ark_ids.pop(0) # don't pop before the write, in case something is wrong
         
     
-def write_records(merged_records, record_processed=True):
-    num_written = 0
+def write_records(merged_records, record_processed=False, offset=0):
+    num_written = offset
     for record in merged_records:
         num_written += 1
         doc = record.to_cpf()
@@ -159,6 +163,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output_dir", help="override target directory from config/app.py [not implemented yet]")
     parser.add_argument("-i", "--id", help="only assemble for this specific ARK ID")
+    #parser.add_argument("-c", "--collection", help="assemble for these collection IDs")
     parser.add_argument("-s", "--starts_at", help="start the assembly at this position", default=0, type=int)
     parser.add_argument("-e", "--ends_at", help="end the assembly at this position", type=int)
     parser.add_argument("-r", "--real", action="store_true", help="request real ARK IDs; do not use this unless in production mode")
