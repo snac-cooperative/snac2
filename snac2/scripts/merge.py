@@ -55,7 +55,7 @@ def output_updated_records_based_on_directory_loop(dir, start_at=None):
         
     
 def write_records(merged_records, record_processed=False, offset=0):
-    num_written = offset
+    num_written = 0 if not offset else offset
     for record in merged_records:
         num_written += 1
         doc = record.to_cpf()
