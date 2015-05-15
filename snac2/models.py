@@ -524,8 +524,10 @@ class MergedRecord(meta.Base, Entity):
     invalidates_record_id = Column(types.BigInteger, ForeignKey('merged_records.id', onupdate="CASCADE", ondelete="SET NULL"), nullable=True, index=True )
     created_at = Column(DateTime(), nullable=False, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime(), nullable=False, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, index=True)
+    invalid_reason = Column(types.UnicodeText, nullable=True)
     invalidates = orm.relationship("MergedRecord", backref=orm.backref("invalidated_by"), foreign_keys=[invalidates_record_id], remote_side=[id], uselist=False)
-    last_output_at = Column(DateTime(), nullable=True, index=True)
+    
+    #last_output_at = Column(DateTime(), nullable=True, index=True)
 
     __mapper_args__ = {
         'polymorphic_on':r_type
@@ -752,16 +754,42 @@ class MergedRecord(meta.Base, Entity):
             doc = xml.dom.minidom.parseString(combined_record)
         except Exception, e:
             doc = None
+            logging.warning(e)
+            logging.warning( "Failed record follows" )
             logging.warning( combined_record )
         return doc
     
     def create_tombstone_record(self):
-        pass
+        # bit of a hack right now to insert maintenance status just-in-time
+        cpf = self.record_data
+        if cpf:
+            doc = xml.dom.minidom.parseString(cpf.encode('utf-8'))
+            maintenanceNode = doc.getElementsByTagName("maintenanceStatus")[0]
+            maintenanceNode.firstChild.replaceWholeText("cancelled")
+            cancelEventNode = utils.minidom_create_element(doc, "maintenanceEvent")
+            eventTypeNode = utils.minidom_create_element(doc, "eventType", text="cancelled")
+            cancelEventNode.appendChild(eventTypeNode)
+            if self.invalid_reason:
+                eventTypeNode = utils.minidom_create_element(doc, "eventDescription", text=self.invalid_reason)
+            if self.invalidated_by:
+                if len(self.invalidated_by) == 1:
+                    otherRecordNode = utils.minidom_create_element(doc, "otherRecordId", attrs={"localType":"http://socialarchive.iath.virginia.edu/control/term#MergedInto"}, text=self.invalidated_by[0].canonical_id)
+                    cancelEventNode.appendChild(otherRecordNode)
+                elif len(self.invalidated_by) > 1:
+                    for r in self.invalidated_by:
+                        otherRecordNode = utils.minidom_create_element(doc, "otherRecordId", attrs={"localType":"http://socialarchive.iath.virginia.edu/control/term#SplitInto"}, text=r.canonical_id)
+                        cancelEventNode.appendChild(otherRecordNode)
+            historyNode =  doc.getElementsByTagName("maintenanceHistory")[0]
+            previousEventNode = doc.getElementsByTagName("maintenanceEvent")[0]
+            historyNode.insertBefore(cancelEventNode, previousEventNode)
+            return doc.toxml().encode('utf-8')
+        else:
+            return None
     
     def create_combined_record(self):
         # drawn from code formerly in merge.py
         # TODO: still need to rewrite this to use a real parser instead of writing out strings.
-        # TODO: and get rid of freaking minidom
+        # TODO: and get rid of minidom
         cpfRecords = [record.path for record in self.record_group.records]
         viaf_info = snac2.viaf.VIAF.get_empty_viaf_dict()
         if self.record_group.viaf_record:
@@ -1306,7 +1334,7 @@ class MergedRecord(meta.Base, Entity):
     
         return cr.getvalue()
     
-    def split_record(self, id_groups):
+    def split_record(self, id_groups, reason=None):
         '''id_groups is a list of lists, containing original_record.ids for each group to split out'''
         if not self.record_data:
             # try to save a copy of the cpf
@@ -1330,15 +1358,39 @@ class MergedRecord(meta.Base, Entity):
                 record_group.records.append(record) # this is a SQLAlchemy dynamic collection that automatically reassigns the foreign key.  in theory.
             new_record_groups.append(record_group)
         flush() # make sure we have ids to work with
-        # set the old record_group to invalid, and set invalidates_by
+        # set the old record_group to invalid, and set invalidated_by
         self.valid = False
         for record_group in new_record_groups:
             merged_record = MergedRecord(r_type=record_group.g_type, name=record_group.name, record_data="", valid=True)
             merged_record.save()
             merged_record.record_group_id = record_group.id
             merged_record.invalidates_record_id = self.id
+        self.invalid_reason = reason
         commit()
         return new_record_groups
+        
+    def absorb_record(self, target_merged_record, reason=None):
+        '''given another merged_record, take over all the original_records it has, record the final tombstone, and redirect the target to this one'''
+        target_rg = target_merged_record.record_group
+        if not target_rg:
+            logging.warning("target_merged_record %d does not have a proper record_group and seems to be invalid" % (target_merged_record.id))
+            return None
+        final_cpf = target_merged_record.to_cpf()
+        if not final_cpf:
+            logging.warning("Could not generate final CPF for MergedRecord %d.  aborting." % (target_merged_record.id))
+            return None
+        target_merged_record.record_data = final_cpf.toxml()
+        flush()
+        for record in target_rg.records:
+            record.record_group_id = self.record_group.id
+            #self.record_group.records.append(record)
+        flush()
+        target_merged_record.valid = False
+        self.invalidates = target_merged_record
+        target_merged_record.invalid_reason = reason
+        commit()
+        return self
+        
         
 def merge_name_entries(viaf_auths, viaf_alts, cpf_identities):
     merged_names = {}

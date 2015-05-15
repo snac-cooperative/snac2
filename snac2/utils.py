@@ -1,6 +1,7 @@
 import string, random, uuid, datetime, time, decimal, re, collections, os, os.path, unicodedata
 import urlparse, urllib, urllib2
 import lxml.etree as etree, io
+import xml.dom.minidom
 import jellyfish
 
 class URI(object):
@@ -219,6 +220,16 @@ def name_entry_normalize(s):
     pat2 = re.compile(ur"[\[\]'']", flags=re.UNICODE)
     s = pat2.sub("", s)
     return compress_spaces(s).lower()
+    
+def minidom_create_element(doc, tag_name, attrs=None, text=None):
+    node = doc.createElement(tag_name)
+    if attrs:
+        for attr in attrs.keys():
+            node.setAttribute(attr, attrs[attr])
+    if text:
+        textNode = doc.createTextNode(text)
+        node.appendChild(textNode)
+    return node
 
 # def name_entry_normalize(etree_doc):
 #     norm_xslt='''<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
