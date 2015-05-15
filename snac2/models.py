@@ -411,7 +411,9 @@ class RecordGroup(meta.Base, Entity):
     records = orm.relationship("OriginalRecord", backref=orm.backref("record_group", uselist=False))
     merge_records = orm.relationship("MergedRecord", backref=orm.backref("record_group", uselist=False))
     maybe_candidates = orm.relationship("MaybeCandidate", backref=orm.backref("record_group", uselist=False))
-
+    previous_records = orm.relationship("OriginalRecord",
+                    secondary="removed_references",
+                    backref="previous_groups")
     __mapper_args__ = {
         'polymorphic_on':g_type
     }
@@ -744,11 +746,7 @@ class MergedRecord(meta.Base, Entity):
     
     def to_cpf(self):
         logging.info("creating output for %d: %s" % (self.record_group.id, self.canonical_id))
-        if self.valid:
-            combined_record = self.create_combined_record()
-        else:
-            # generate pointer record
-            combined_record = self.create_tombstone_record()
+        combined_record = self.create_combined_record()
         #print combined_record
         try:
             doc = xml.dom.minidom.parseString(combined_record)
@@ -759,8 +757,8 @@ class MergedRecord(meta.Base, Entity):
             logging.warning( combined_record )
         return doc
     
-    def create_tombstone_record(self):
-        # bit of a hack right now to insert maintenance status just-in-time
+    def create_tombstone_record_from_stored(self):
+        # not used; human validation only
         cpf = self.record_data
         if cpf:
             doc = xml.dom.minidom.parseString(cpf.encode('utf-8'))
@@ -790,7 +788,11 @@ class MergedRecord(meta.Base, Entity):
         # drawn from code formerly in merge.py
         # TODO: still need to rewrite this to use a real parser instead of writing out strings.
         # TODO: and get rid of minidom
-        cpfRecords = [record.path for record in self.record_group.records]
+        cpfRecords = []
+        if self.valid:
+            cpfRecords = [record.path for record in self.record_group.records]
+        else:
+            cpfRecords = [record.path for record in self.record_group.previous_records]
         viaf_info = snac2.viaf.VIAF.get_empty_viaf_dict()
         if self.record_group.viaf_record:
             viaf_info = snac2.viaf.getEntityInformation(self.record_group.viaf_record)
@@ -924,7 +926,7 @@ class MergedRecord(meta.Base, Entity):
                                 logging.warning( "record not valid" )
                     else:
                         logging.warning( "Warning %s has no original record" % (extracted_record_id) )
-                        continue
+                        
                     relation.removeChild(relation.getElementsByTagName("descriptiveNote")[0])
                     if not seen:
                         filtered_relations.append(relation)
@@ -958,8 +960,20 @@ class MergedRecord(meta.Base, Entity):
         if canonical_id:
             cr.write('<recordId>%s</recordId>' % canonical_id)
 
+        if not self.valid:
+            if self.invalidated_by:
+                if len(self.invalidated_by) == 1:
+                    cr.write('<otherRecordId localType="%s">%s</otherRecordId>' % ("http://socialarchive.iath.virginia.edu/control/term#MergedInto", self.invalidated_by[0].canonical_id))
+                elif len(self.invalidated_by) > 1:
+                    for record in self.invalidated_by:
+                        cr.write('<otherRecordId localType="%s">%s</otherRecordId>' % ("http://socialarchive.iath.virginia.edu/control/term#SplitInto", record.canonical_id))
+        if self.invalidates:
+            if len(self.invalidates.invalidated_by) == 1:
+                cr.write('<otherRecordId localType="%s">%s</otherRecordId>' % ("http://socialarchive.iath.virginia.edu/control/term#MergedFrom", self.invalidates.canonical_id))
+            elif len(self.invalidated_by) > 1:
+                cr.write('<otherRecordId localType="%s">%s</otherRecordId>' % ("http://socialarchive.iath.virginia.edu/control/term#SplitFrom", self.invalidates.canonical_id))
         for recordId in mrecordIds:
-            cr.write('<otherRecordId  localType="http://socialarchive.iath.virginia.edu/control/term#MergedRecord">%s</otherRecordId>' %recordId)
+            cr.write('<otherRecordId localType="http://socialarchive.iath.virginia.edu/control/term#MergedRecord">%s</otherRecordId>' %recordId)
             i = i + 1
         
         #VIAF
@@ -978,8 +992,11 @@ class MergedRecord(meta.Base, Entity):
         #    cr.write('dbpedia:%s' %dbpediaRecordId)
         #    cr.write('</otherRecordId>')
 
-        #Maintanence
-        cr.write("<maintenanceStatus>revised</maintenanceStatus>")
+        #Maintenance
+        if self.valid:
+            cr.write("<maintenanceStatus>revised</maintenanceStatus>")
+        else:
+            cr.write("<maintenanceStatus>cancelled</maintenanceStatus>")
         cr.write("""<maintenanceAgency>
                          <agencyName>SNAC: Social Networks and Archival Context Project</agencyName>
                     </maintenanceAgency>""")
@@ -998,18 +1015,26 @@ class MergedRecord(meta.Base, Entity):
 
     
         #Maintenance History
-        #TODO: insert backreference to invalidated record
-        
-        cr.write("""<maintenanceHistory>
-                    <maintenanceEvent>
-                    <eventType>revised</eventType>
-                    <eventDateTime>%s</eventDateTime> 
-                    <agentType>machine</agentType>
-                    <agent>CPF merge program</agent>
-                    <eventDescription>Merge v2.0</eventDescription>
-                    </maintenanceEvent>
-                    </maintenanceHistory>""" %datetime.date.today())
-        
+        if self.valid:
+            cr.write("""<maintenanceHistory>
+                        <maintenanceEvent>
+                        <eventType>revised</eventType>
+                        <eventDateTime>%s</eventDateTime> 
+                        <agentType>machine</agentType>
+                        <agent>CPF merge program</agent>
+                        <eventDescription>Merge v2.0</eventDescription>
+                        </maintenanceEvent>
+                        </maintenanceHistory>""" % datetime.date.today())
+        else:
+            cr.write("""<maintenanceHistory>
+             <maintenanceEvent>
+            <eventType>cancelled</eventType>
+            <eventDateTime>%s</eventDateTime> 
+            <agentType>machine</agentType>
+            <agent>CPF merge program</agent>
+            <eventDescription>%s</eventDescription>
+            </maintenanceEvent>
+            </maintenanceHistory>""" % (datetime.date.today(), self.invalid_reason if self.invalid_reason else ""))
         
         #Sources
         cr.write("<sources>")
@@ -1356,6 +1381,7 @@ class MergedRecord(meta.Base, Entity):
                     record_group.name = record.name_norm
                 record_group.save()
                 record_group.records.append(record) # this is a SQLAlchemy dynamic collection that automatically reassigns the foreign key.  in theory.
+                self.record_group.previous_records.append(record)
             new_record_groups.append(record_group)
         flush() # make sure we have ids to work with
         # set the old record_group to invalid, and set invalidated_by
@@ -1383,6 +1409,7 @@ class MergedRecord(meta.Base, Entity):
         flush()
         for record in target_rg.records:
             record.record_group_id = self.record_group.id
+            target_rg.previous_records.append(record)
             #self.record_group.records.append(record)
         flush()
         target_merged_record.valid = False
@@ -1445,3 +1472,10 @@ class CorporateMergedRecord(MergedRecord):
     
 class FamilyMergedRecord(MergedRecord):
     __mapper_args__ = {'polymorphic_identity': RECORD_TYPE_FAMILY}
+
+class RemovedReference(meta.Base, Entity):
+    __tablename__ = 'removed_references'
+    id = Column(types.BigInteger, primary_key=True)    
+    original_record_id = Column(types.BigInteger, ForeignKey('original_records.id', onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True )
+    record_group_id = Column(types.BigInteger, ForeignKey('record_groups.id', onupdate="CASCADE", ondelete="CASCADE"), nullable=False, index=True )
+    created_at = Column(DateTime(), nullable=False, default=datetime.datetime.utcnow)
