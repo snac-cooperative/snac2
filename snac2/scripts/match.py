@@ -6,6 +6,7 @@ import snac2.models as models
 import snac2.viaf as viaf
 import snac2.utils as utils
 import dateutil.parser, datetime
+import lxml.etree as etree
 import os, logging, re
 import nameparser
 
@@ -52,9 +53,18 @@ def match_persons(batch_size=None, starts_at=None, ends_at=None):
         candidate = None
         maybe_viaf_id = None
         maybe_postgres_id = None
+        record_group = None
+        
+        # if the collection is BNF, use sameAs matching first
+        if record.collection_id == "ead_bnf":
+            logging.info("attempting nsid special match on %d" % (record.id))
+            record_group, viaf_id, viaf_record, match_quality = match_any_nsid_viaf(record)
+            if record_group:
+                logging.info("matched %d using nsid special %s" % (record.id, record_group.viaf_id))
         
         # exact match against in-db records
-        record_group, viaf_id, viaf_record, match_quality = match_person_exact(record)
+        if not record_group and not viaf_id:
+            record_group, viaf_id, viaf_record, match_quality = match_person_exact(record)
             
         # ngram
         if not record_group and not viaf_id:
@@ -240,23 +250,26 @@ def match_person_exact(record, in_db_match=True):
     if in_db_match:
         record_group = models.PersonGroup.get_by_name(record.name_norm)
         if record_group:
-            quality_date_from = DATE_NO_DATA
-            quality_date_to = DATE_NO_DATA
-            for candidate in record_group.records:
-                date_from, date_to = check_existence_dates_with_datetime(record, candidate.to_date, candidate.from_date)
-                if date_from > quality_date_from:
-                    quality_date_from = date_from
-                if date_to > quality_date_to:
-                    quality_date_to = date_to
-            if (((len(record.name_norm) > 10) and (quality_date_from > DATE_MATCH_FAIL or quality_date_to > DATE_MATCH_FAIL)) or
-                ((len(record_group.name) > 30 or utils.has_n_digits(record_group.name, n=2)) and (quality_date_from != DATE_MATCH_FAIL and quality_date_to != DATE_MATCH_FAIL))
-                ):
-                # if either the name length is greater than 10, and has either a matching date_from or a matching date_to
-                # or if the length is greater than 35, or has at least 2 digits (a year) in the name, and didn't fail quality date checks (but can be empty)
-                logging.info("record_group %d:%s found in database for record %d:%s" % (record_group.id, record_group.name, record.id, record.name_norm))
-                return record_group, record_group.viaf_id, record_group.viaf_record, 1
+            if record_group.merge_records and not record_group.merge_records[0].valid:
+                logging.info("record_group %d:%s found in database for record %d:%s but is invalid, skipping" % (record_group.id, record_group.name, record.id, record.name_norm))
             else:
-                logging.info("failed validation check record_group %d:%s for record %d:%s" % (record_group.id, record_group.name, record.id, record.name_norm))
+                quality_date_from = DATE_NO_DATA
+                quality_date_to = DATE_NO_DATA
+                for candidate in record_group.records:
+                    date_from, date_to = check_existence_dates_with_datetime(record, candidate.to_date, candidate.from_date)
+                    if date_from > quality_date_from:
+                        quality_date_from = date_from
+                    if date_to > quality_date_to:
+                        quality_date_to = date_to
+                if (((len(record.name_norm) > 10) and (quality_date_from > DATE_MATCH_FAIL or quality_date_to > DATE_MATCH_FAIL)) or
+                    ((len(record_group.name) > 30 or utils.has_n_digits(record_group.name, n=2)) and (quality_date_from != DATE_MATCH_FAIL and quality_date_to != DATE_MATCH_FAIL))
+                    ):
+                    # if either the name length is greater than 10, and has either a matching date_from or a matching date_to
+                    # or if the length is greater than 35, or has at least 2 digits (a year) in the name, and didn't fail quality date checks (but can be empty)
+                    logging.info("record_group %d:%s found in database for record %d:%s" % (record_group.id, record_group.name, record.id, record.name_norm))
+                    return record_group, record_group.viaf_id, record_group.viaf_record, 1
+                else:
+                    logging.info("failed validation check record_group %d:%s for record %d:%s" % (record_group.id, record_group.name, record.id, record.name_norm))
     is_spirit = False
     if "(spirit)" in record.name.lower():
         is_spirit = True
@@ -425,31 +438,32 @@ def viaf_match_ngram(record):
                 else:
                     logging.info("passed existence check %d %d" % (quality_from, quality_to))
                 if record.r_type=="person":
-                    x = utils.strip_accents(m['mainHeadings'][0])
-                    y = utils.strip_accents(record.name)
-                    name_quality = compute_name_match_quality(x, y)
-                    if name_quality >= STR_FUZZY_MATCH_THRESHOLD:
-                        logging.info("accepted as yes or maybe: %s for %s at %0.4f" % (x, y, name_quality))
-                        return m, name_quality
-                        #possible_matches.append((m, name_quality))
-                    else:
-                        logging.info("rejected: %s %.4f" % (x, name_quality))
-                elif record.r_type=="corporate":
-                    length = utils.computeJaroWinklerDistance(x, y)
-                    if length >= STR_FUZZY_MATCH_THRESHOLD:
-                        logging.info("accepted: %s for %s at %0.4f" % (x, y, length))
-                        #possible_matches.append((m, length))
-                        return m, length
-                    else:
-                        logging.info("rejected: %s %.4f" % (x, length))
-                else:
-                    distance = utils.computeSimpleRelativeLength(x, y)
-                    if 1-distance >= STR_FUZZY_MATCH_THRESHOLD:
-                        logging.info("accepted: %s for %s at %0.4f" % (x, y, 1-distance))
-                        #possible_matches.append((m, 1-distance))
-                        return m, 1-distance
-                    else:
-                        logging.info("rejected: %s %.4f" % (x, 1-distance))
+                    for heading in m['mainHeadings']:
+                        x = utils.strip_accents(heading)
+                        y = utils.strip_accents(record.name)
+                        name_quality = compute_name_match_quality(x, y)
+                        if name_quality >= STR_FUZZY_MATCH_THRESHOLD:
+                            logging.info("accepted as yes or maybe: %s for %s at %0.4f" % (x, y, name_quality))
+                            return m, name_quality
+                            #possible_matches.append((m, name_quality))
+                        else:
+                            logging.info("rejected heading: %s %.4f" % (x, name_quality))
+                # elif record.r_type=="corporate":
+#                     length = utils.computeJaroWinklerDistance(x, y)
+#                     if length >= STR_FUZZY_MATCH_THRESHOLD:
+#                         logging.info("accepted: %s for %s at %0.4f" % (x, y, length))
+#                         #possible_matches.append((m, length))
+#                         return m, length
+#                     else:
+#                         logging.info("rejected: %s %.4f" % (x, length))
+#                 else:
+#                     distance = utils.computeSimpleRelativeLength(x, y)
+#                     if 1-distance >= STR_FUZZY_MATCH_THRESHOLD:
+#                         logging.info("accepted: %s for %s at %0.4f" % (x, y, 1-distance))
+#                         #possible_matches.append((m, 1-distance))
+#                         return m, 1-distance
+#                     else:
+#                         logging.info("rejected: %s %.4f" % (x, 1-distance))
 
         return viaf.VIAF.get_empty_viaf_dict(), 0
         #NOTE: reranking actually decreases accuracy; use jaro as a sanity check on ngram instead
@@ -473,7 +487,15 @@ def viaf_match_ngram(record):
 def match_families(batch_size=1000):
     records = models.FamilyOriginalRecord.get_all_unprocessed_records(limit=batch_size)
     for record in records:
-        record_group = record.record_group
+        record_group = None
+        viaf_id = None
+        if record.collection_id == "ead_bnf":
+            logging.info("attempting nsid special match on %d" % (record.id))
+            record_group, viaf_id, viaf_record, match_quality = match_any_nsid_viaf(record)
+            if record_group:
+                logging.info("matched %d using nsid special %s" % (record.id, record_group.viaf_id))
+        if not record_group and not viaf_id:
+            record_group = record.record_group
         if not record_group:
             record_group = models.FamilyGroup(name=record.name_norm)
             record_group.save()
@@ -491,7 +513,16 @@ def match_families(batch_size=1000):
 def match_corporate(batch_size=1000):
     records = models.CorporateOriginalRecord.get_all_unprocessed_records(limit=batch_size)
     for record in records:
-        record_group, viaf_id, viaf_record, match_quality = match_exact(record, record_type="corporate")
+        record_group = None
+        viaf_id = None
+        if record.collection_id == "ead_bnf":
+            logging.info("attempting nsid special match on %d" % (record.id))
+            record_group, viaf_id, viaf_record, match_quality = match_any_nsid_viaf(record)
+            if record_group:
+                logging.info("matched %d using nsid special %s" % (record.id, record_group.viaf_id))
+        # exact match against in-db records
+        if not record_group and not viaf_id:
+            record_group, viaf_id, viaf_record, match_quality = match_exact(record, record_type="corporate")
         maybe_viaf_id = None
         if not record_group and not viaf_id:
             record_group, viaf_id, viaf_record, match_quality = match_corp_keyword_viaf(record)
@@ -550,18 +581,20 @@ def viaf_match_keyword_person(record):
                     logging.info("Failed keyword existence check")
                     continue
                 elif quality_to == DATE_MATCH_EXACT and quality_from == DATE_MATCH_EXACT and record.name.startswith(m['mainHeadings'][0][:5]):
+                    #shortcut
                     return m, 1
                 else:
                     logging.info("passed existence check %d %d" % (quality_from, quality_to))
-                x = utils.strip_accents(m['mainHeadings'][0])
-                y = utils.strip_accents(record.name)
-                name_quality = compute_name_match_quality(x, y)
-                if name_quality >= STR_FUZZY_MATCH_THRESHOLD:
-                    logging.info("accepted as yes or maybe: %s for %s at %0.4f" % (x, y, name_quality))
-                    return m, name_quality
-                    #possible_matches.append((m, name_quality))
-                else:
-                    logging.info("rejected: %s %.4f" % (x, name_quality))
+                for heading in m['mainHeadings']:
+                    x = utils.strip_accents(heading)
+                    y = utils.strip_accents(record.name)
+                    name_quality = compute_name_match_quality(x, y)
+                    if name_quality >= STR_FUZZY_MATCH_THRESHOLD:
+                        logging.info("accepted as yes or maybe: %s for %s at %0.4f" % (x, y, name_quality))
+                        return m, name_quality
+                        #possible_matches.append((m, name_quality))
+                    else:
+                        logging.info("rejected: %s %.4f" % (x, name_quality))
                 
 
     return viaf.VIAF.get_empty_viaf_dict(), 0
@@ -574,11 +607,12 @@ def viaf_match_keyword(record, name_type="corporate"):
     viaf_matches = viaf.query_cheshire_viaf(name_norm, index="mainname", name_type=name_type)
     viaf_matches = [viaf.getEntityInformation(r) for r in viaf_matches]
     for m in viaf_matches:
-        candidate_name = utils.strip_corp_abbrevs(utils.strip_accents(utils.normalize_name_without_punc_with_space(m['mainHeadings'][0])))
-        length = utils.computeJaroWinklerDistance(name_norm, candidate_name)
-        if length >= STR_FUZZY_MATCH_THRESHOLD:
-            logging.info("accepted as yes or maybe: %s for %s at %0.4f" % (name_norm, candidate_name, length))
-            return m, length
+        for heading in m['mainHeadings']:                    
+            candidate_name = utils.strip_corp_abbrevs(utils.strip_accents(utils.normalize_name_without_punc_with_space(heading)))
+            length = utils.computeJaroWinklerDistance(name_norm, candidate_name)
+            if length >= STR_FUZZY_MATCH_THRESHOLD:
+                logging.info("accepted as yes or maybe: %s for %s at %0.4f" % (name_norm, candidate_name, length))
+                return m, length
     return viaf.VIAF.get_empty_viaf_dict(), 0 
 
 def match_corp_keyword_viaf(record):
@@ -596,6 +630,28 @@ def match_person_keyword_viaf(record):
         return record_group, match['recordId'], match['_raw'], match_quality
     else:
         return None, None, None, -1
+
+def match_any_nsid_viaf(record):
+    nsmap = {"eac":"urn:isbn:1-931666-33-4", "xlink":"http://www.w3.org/1999/xlink"}
+    p = etree.XMLParser(huge_tree=True) # retry the parse with a huge_tree
+    doc = etree.parse(record.path, parser=p)
+    sameAs_relations = doc.xpath('//eac:cpfRelation[@xlink:arcrole="http://www.w3.org/2002/07/owl#sameAs"]', namespaces=nsmap)
+    if not sameAs_relations:
+        logging.info("No sameAs found in %d"  % (record.id))
+        return None, None, None, -1
+    nsid = sameAs_relations[0].attrib.get("{http://www.w3.org/1999/xlink}href")
+    if not nsid:
+        logging.info("No nsid found in %d"  % (record.id))
+        return None, None, None, -1
+    if nsid.endswith("/PUBLIC"):
+        nsid = nsid[:-1*len("/PUBLIC")]
+    viaf_record = viaf.query_cheshire_nsid(nsid)
+    if not viaf_record:
+        logging.info("No viaf found for %d using nsid %s"  % (record.id, nsid))
+        return None, None, None, -1
+    match = viaf.getEntityInformation(viaf_record)
+    record_group = models.RecordGroup.get_by_viaf_id(match['recordId'])
+    return record_group, match['recordId'], match['_raw'], 1
     
 
 if __name__ == "__main__":

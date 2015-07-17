@@ -455,6 +455,30 @@ def query_cheshire_viaf_id(viaf_id, name_type="person", db="viaf", limit=1, inde
             cheshire.closeresult(r)
         raise e
     return record
+    
+    
+def query_cheshire_nsid(nsid, name_type="", db="viaf", limit=1, index="xnsid"):
+    record = None
+    try:
+        if name_type == "person":
+            name_type = "personal"
+        elif name_type == "corporateBody":
+            name_type = "corporate"
+        searchstr = "%s '%s'" % (index, nsid)
+        if name_type:
+            searchstr += " and nametype '%s'" % (name_type)
+        logging.info("searching for '%s'" % searchstr.encode('utf-8'))
+        r = cheshire.Search(searchstr.encode('utf-8'))
+        n = cheshire.getnumfound(r)
+        logging.info ("%d records found; limit set to %d" % (n, limit))
+        if n:
+            record = cheshire.getrecord(r,0)
+            rel = cheshire.getrelevance(r,0)
+    except Exception, e:
+        if r:
+            cheshire.closeresult(r)
+        raise e
+    return record
         
 
 def query_cheshire_viaf(name, name_type=None, index="mainnamengram", config_path=None, db='viaf', limit=10, is_spirit=False):

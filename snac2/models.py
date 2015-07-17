@@ -240,7 +240,7 @@ class OriginalRecord(meta.Base, Entity):
         if not record_class:
             return None
         
-        extractNodeValue = lambda xmlNodeList: (xmlNodeList[0].childNodes[0].nodeValue)  if len(xmlNodeList) > 0 and len(xmlNodeList[0].childNodes) > 0 else None
+        #extractNodeValue = lambda xmlNodeList: (xmlNodeList[0].childNodes[0].nodeValue)  if len(xmlNodeList) > 0 and len(xmlNodeList[0].childNodes) > 0 else None
         
         #ID
         entityId = doc.getElementsByTagName("recordId")
@@ -293,11 +293,13 @@ class OriginalRecord(meta.Base, Entity):
         return d, d_type
     
     @classmethod
-    def get_all_unprocessed_records(cls, options=None, session=None, limit=None, min_id=None, max_id=None):
+    def get_all_unprocessed_records(cls, options=None, session=None, limit=None, min_id=None, max_id=None, collection_id=None):
         if not session:
             session = meta.Session
         q = session.query(cls)
         q = q.filter(cls.processed==False)
+        if collection_id:
+            q = q.filter(cls.collection_id==collection_id)
         if min_id:
             q = q.filter(cls.id>=min_id)
         if max_id:
@@ -887,47 +889,54 @@ class MergedRecord(meta.Base, Entity):
                 filtered_relations = []
                 for relation in relations:
                     seen = False
+                    # detect whether there is an internal SNAC relation to dereference
                     extracted_records = relation.getElementsByTagName("span")
-                    extracted_records = extracted_records[0]
-                    extracted_record_id = extracted_records.childNodes[0].nodeValue
-                    extracted_record_id = extracted_record_id.strip()
-                    #print "EXTRACTED SOURCE ID %s from %s" % (extracted_record_id, cpfRecord)
-                    if extracted_record_id.startswith("recordId: "):
-                        extracted_record_id = extracted_record_id[len("recordId: "):] # correct for extraneous henry_cpf prefixes
-                    original_record = OriginalRecord.get_by_source_id(extracted_record_id)
-                    if original_record:
-                        record_group = original_record.record_group
-                        if not record_group:
-                            logging.warning("Warning %s has no record_group" % (extracted_record_id))
-                            relation.setAttribute("xlink:href", "")
-                            continue
-                        merge_records = record_group.merge_records
-                        if not merge_records:
-                            logging.warning("Warning %s has no merge record" % (extracted_record_id))
-                            relation.setAttribute("xlink:href", "")
-                            continue
-                        for record in merge_records:
-                            if record.canonical_id in relations_canonical_idx:
-                                seen = True # there is a duplicate
-                                #logging.info("%s already seen" % (record.canonical_id))
+                    if extracted_records:
+                        extracted_records = extracted_records[0]
+                        extracted_record_id = extracted_records.childNodes[0].nodeValue
+                        extracted_record_id = extracted_record_id.strip()
+                        #print "EXTRACTED SOURCE ID %s from %s" % (extracted_record_id, cpfRecord)
+                        if extracted_record_id.startswith("recordId: "):
+                            extracted_record_id = extracted_record_id[len("recordId: "):] # correct for extraneous henry_cpf prefixes
+                        original_record = OriginalRecord.get_by_source_id(extracted_record_id)
+                        if original_record:
+                            record_group = original_record.record_group
+                            if not record_group:
+                                logging.warning("Warning %s has no record_group" % (extracted_record_id))
+                                relation.setAttribute("xlink:href", "")
                                 continue
-                            else:
-                                relations_canonical_idx[record.canonical_id] = 1 # make sure no duplicates
-                                #logging.info( "%s recorded" % (record.canonical_id) )
-                            if record.valid:
-                                if record.canonical_id:
-                                    
-                                    relation.setAttribute("xlink:href", record.canonical_id)
+                            merge_records = record_group.merge_records
+                            if not merge_records:
+                                logging.warning("Warning %s has no merge record" % (extracted_record_id))
+                                relation.setAttribute("xlink:href", "")
+                                continue
+                            for record in merge_records:
+                                if record.canonical_id in relations_canonical_idx:
+                                    seen = True # there is a duplicate
+                                    #logging.info("%s already seen" % (record.canonical_id))
+                                    continue
                                 else:
-                                    logging.warning( "Warning %s has no ARK ID" % (extracted_record_id) )
-                                    relation.setAttribute("xlink:href", "")
-                                break
-                            else:
-                                logging.warning( "record not valid" )
+                                    relations_canonical_idx[record.canonical_id] = 1 # make sure no duplicates
+                                    #logging.info( "%s recorded" % (record.canonical_id) )
+                                if record.valid:
+                                    if record.canonical_id:
+                                    
+                                        relation.setAttribute("xlink:href", record.canonical_id)
+                                    else:
+                                        logging.warning( "Warning %s has no ARK ID" % (extracted_record_id) )
+                                        relation.setAttribute("xlink:href", "")
+                                    break
+                                else:
+                                    logging.warning( "record not valid" )
+                        else:
+                            logging.warning( "Warning %s has no original record" % (extracted_record_id) )
+                        relation.removeChild(relation.getElementsByTagName("descriptiveNote")[0])
                     else:
-                        logging.warning( "Warning %s has no original record" % (extracted_record_id) )
+                        # in this case, we assume there is a xlink:href already, probably external -- pass the relation through without modification
+                        href = relation.attributes.get("xlink:href")
+                        if not href:
+                            logging.warning("Failed to see a xlink:href in %s and no descriptiveNote either" % (cpfRecord))
                         
-                    relation.removeChild(relation.getElementsByTagName("descriptiveNote")[0])
                     if not seen:
                         filtered_relations.append(relation)
                 mrelations.extend(filtered_relations)

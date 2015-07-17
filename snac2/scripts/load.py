@@ -78,7 +78,7 @@ if __name__ == "__main__":
     db_uri = db_config.get_db_uri()
     models.init_model(db_uri)
     if len(sys.argv) < 2:
-        print "usage: load.py [abbrv_of_collection]"
+        print "usage: load.py [abbrv_of_collection_or_file_dir]"
         sys.exit(-1)
     for c in sys.argv[1:]:
         if c in app_config.__dict__ and isinstance(app_config.__dict__[c], basestring):

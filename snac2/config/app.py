@@ -39,7 +39,7 @@ bl = '/lv1/data/extract/britlib'
 
 #Path to the directory where the merged records are created (Create directory)
 #merged = '/projects/snac-output/update-test'
-merged = '/projects/snac-output/update-run4'
+merged = '/projects/snac-output/update-run5'
 
 aps = '/lv1/data/extract/ead_aps'
 yale = '/lv1/data/extract/ead_yale'
