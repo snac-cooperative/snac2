@@ -1,5 +1,6 @@
 import urllib
 
+# WARNING: This API has been discontinued.  Look for an alternative way to access ARK API features.
 NOID_STAGING_API = "http://noid.cdlib.org/nd/noidu_fk4?mint+%d"
 NOID_PRODUCTION_API = "http://noid.cdlib.org/nd/noidu_w6?mint+%d"
 ARK_BASE_URI = "http://n2t.net/ark:/"
@@ -16,11 +17,15 @@ def mint_n(n, is_fake=True):
     if is_fake:
         api = NOID_STAGING_API % (n)
     ids = []
-    response = urllib.urlopen(api).read()
+    response = urllib.urlopen(api)
     if response:
+        if (response.code > 300):
+            raise RuntimeError("The NOID ARK API has been discontinued.")
+        response = response.read()
         lines = response.split("\n")
         lines = filter(None, lines)
         for line in lines:
+            print line
             line_components = line.strip().split(": ")
             ids.append(line_components[1])
         return ids

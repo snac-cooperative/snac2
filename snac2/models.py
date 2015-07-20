@@ -1191,7 +1191,7 @@ class MergedRecord(meta.Base, Entity):
             else:
                 misc.append(localDescription)
                     #cr.write(localDescription.toxml().encode('utf-8'))
-		
+
         subjects_list = subjects.items()
         subjects_list.sort(key=lambda x: x[1], reverse=True)
         desc_places_list = desc_places.items()
