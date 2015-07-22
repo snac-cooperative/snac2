@@ -215,39 +215,6 @@ def getRecordId(doc):
     except:
         logging.info("ERROR: Error parsing viafId")
         return None
-        
-def getMainHeadingEl(doc):
-    mainHeadings = []
- #    try:
-    mainHeadingEls = doc.findall("viaf:mainHeadings/viaf:mainHeadingEl", namespaces=NSMAP)
-    for mainHeadingEl in mainHeadingEls:
-        source = mainHeadingEl.find("viaf:sources/viaf:s", namespaces=NSMAP)
-        data = {}
-        if source.text.startswith("LC"):
-            lcid = mainHeadingEl.find("viaf:id", namespaces=NSMAP)
-            lcid_raw = lcid.text.split("|")[1]
-            lcid = lcid_raw.split()
-            lccn_wcid = ""
-            loc_id = ""
-            if len(lcid) < 2:
-                lccn_wcid = "lccn-%s" % (lcid[0])
-                loc_id = lcid
-            else:
-                lccn_wcid = "lccn-%s-%s" % (lcid[0][0] + lcid[1].strip()[:2], lcid[1].strip()[3:])
-                loc_id = "%s%s" % (lcid[0][0] + lcid[1].strip()[:2], lcid[1].strip()[2:])
-            data["source"] = source.text
-            data["lccn_id"] = lccn_wcid
-            data["loc_id"]=loc_id
-        elif source.text.startswith("WKP"):
-            data["source"] = source.text
-            url_id = mainHeadingEl.find("viaf:id", namespaces=NSMAP).text.split("|")[1]
-            data["url_id"] = unicode(url_id)
-        if data:
-            mainHeadings.append(data)
-    return mainHeadings
-#     except:
-#         #logging.info("ERROR: Error parsing mainHeadingEl")
-#         return None
 
 def getMainHeadingEl2(doc):
     mainHeadings = []
@@ -265,13 +232,13 @@ def getMainHeadingEl2(doc):
                 lcid_prefix = lcid_parts[0]
                 lcid_number = lcid_parts[1][:2]
                 lcid_suffix = lcid_parts[1][2:]
-                data['lccn_wcid'] = "lccn-%s%s-%s" % (lcid_prefix, lcid_number, lcid_suffix)
+                data['lccn_wcid'] = "lccn-%s%s%s" % (lcid_prefix, lcid_number, lcid_suffix)
             else:
                 data['lccn_wcid'] = "lccn-%s" % (lcid_parts[0])
             data["lccn_lcid"]=lcid_raw.replace(" ", "")
-            data["source"] = source.text
+            data["source"] = "LC"
         elif source.text.startswith("WKP"):
-            data["source"] = source.text
+            data["source"] = "WKP"
             url_id = mainHeadingEl.find("viaf:id", namespaces=NSMAP).text.split("|")[1]
             data["url_id"] = unicode(url_id)
         if data:

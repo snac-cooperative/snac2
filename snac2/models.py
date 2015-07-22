@@ -835,6 +835,8 @@ class MergedRecord(meta.Base, Entity):
         mfunctions = []
         
         mplaces = []
+        
+        mlanguages = []
     
         relations_canonical_idx = {}
         for cpfRecord in cpfRecords:
@@ -853,9 +855,9 @@ class MergedRecord(meta.Base, Entity):
                 recordIds = identityInfo['id']
                 if recordIds != None:
                     mrecordIds.append(recordIds)         
-                name =  identityInfo['name_entry']
-                if name != None:
-                    mnames.append(name)
+                names =  identityInfo['name_entries']
+                if names != None:
+                    mnames.extend(names)
                 type =  identityInfo['type']
                 if type != None:
                     mtypes.append(type)
@@ -872,6 +874,10 @@ class MergedRecord(meta.Base, Entity):
             occupations = snac2.cpf.parseOccupations(legacyDoc)
             if occupations != None:
                 moccupations.extend(occupations)
+                
+            languages = snac2.cpf.parseLanguageUsed(legacyDoc)
+            if languages:
+                mlanguages.extend(languages)
         
             localDescriptions = snac2.cpf.parseLocalDescriptions(legacyDoc)
             if localDescriptions != None:
@@ -1078,6 +1084,7 @@ class MergedRecord(meta.Base, Entity):
         cpf_names = {}
         for k, val in enumerate(mnames):
             cpf_names[k] = val
+        print cpf_names
         names = merge_name_entries(viaf_info['authForms'], viaf_info['altForms'], cpf_names)
         name_tuples = names.items()
         name_tuples.sort(key=lambda x: x[1].preferenceScore, reverse=True)
@@ -1147,7 +1154,23 @@ class MergedRecord(meta.Base, Entity):
                 #logging.info("No exist dates")
                 pass
             
-    
+        #Languages used from VIAF - should add script
+        entityLanguages = viaf_info['language']
+        for language in set(entityLanguages):
+            cr.write('<languageUsed>')
+            cr.write('<language languageCode="%s"/>' % escape(language.lower()).encode('utf-8'))
+            cr.write('<script scriptCode="Zyyy"/>')
+            cr.write('</languageUsed>')
+        
+        if mlanguages:
+            for language in mlanguages:
+                languageCode = language.getElementsByTagName("language")
+                if languageCode:
+                    languageCode = languageCode[0]
+                    if languageCode.attributes.get("languageCode").value.strip() not in entityLanguages:
+                        entityLanguages.append(languageCode.attributes.get("languageCode").value.strip())
+                        cr.write(language.toxml().encode('utf-8'))
+                        
         # functions
         function_terms = {}
         for function in mfunctions:
@@ -1227,13 +1250,6 @@ class MergedRecord(meta.Base, Entity):
             cr.write('<term>%s</term>' %gender)
             cr.write('</localDescription>')
         
-        #Languages used from VIAF - should add script
-        entityLanguages = viaf_info['language']
-        for language in set(entityLanguages):
-            cr.write('<languageUsed>')
-            cr.write('<language languageCode="%s"/>' % escape(language.lower()).encode('utf-8'))
-            cr.write('<script scriptCode="Zyyy"/>')
-            cr.write('</languageUsed>')
         
         #Occupations
         if moccupations:
@@ -1324,10 +1340,10 @@ class MergedRecord(meta.Base, Entity):
             headingsEl = viaf_info['mainElementEl']
             if headingsEl:
                 for h in headingsEl:
-                    if h["source"] == "LC":
+                    if h["source"].startswith("LC"):
                         cr.write('<cpfRelation xlink:type="simple"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#sameAs" xlink:href="http://www.worldcat.org/wcidentities/%s" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s" />' % (h["lccn_wcid"], r_type_t)) 
                         cr.write('<cpfRelation xlink:type="simple"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#sameAs" xlink:href="http://id.loc.gov/authorities/names/%s" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s" />' % (h["lccn_lcid"], r_type_t)) 
-                    elif h["source"] == "WKP":
+                    elif h["source"].startswith("WKP"):
                         cr.write((u'<cpfRelation xlink:type="simple" xlink:href="http://en.wikipedia.org/wiki/%s"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#sameAs"  xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s" />' % (urllib.quote(h["url_id"].encode('utf-8')), r_type_t)).encode('utf-8')) 
 
         if maybes:

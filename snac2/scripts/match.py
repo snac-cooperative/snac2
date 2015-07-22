@@ -20,10 +20,11 @@ logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d %I:%M:%S %p
 def match_persons_loop(starts_at=None, ends_at=None):
     unprocessed_records = True
     while unprocessed_records:
-        records = match_persons(100, starts_at=starts_at, ends_at=ends_at)
+        records = models.PersonOriginalRecord.get_all_unprocessed_records(limit=100, min_id=starts_at, max_id=ends_at)
         if not records:
             unprocessed_records = False
         else:
+            match_persons(records, starts_at=starts_at, ends_at=ends_at)
             logging.info("retrieving next batch...")
 
 def match_corporate_loop():
@@ -44,8 +45,8 @@ def match_families_loop():
         else:
             logging.info("retrieving next batch...")
 
-def match_persons(batch_size=None, starts_at=None, ends_at=None):
-    records = models.PersonOriginalRecord.get_all_unprocessed_records(limit=batch_size, min_id=starts_at, max_id=ends_at)
+def match_persons(records):
+    
     for record in records:
         viaf_id = None
         viaf_record = None

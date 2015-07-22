@@ -78,8 +78,9 @@ def write_records(merged_records, record_processed=False, offset=0):
             models.commit()
     return num_written
 
-def create_merged_records(start_at=0, is_fake=True, batch_size=1000, skip_canonical_id=False):
-    record_groups = models.RecordGroup.get_all_with_no_merge_record(limit=batch_size)
+def create_merged_records(start_at=0, is_fake=True, batch_size=1000, skip_canonical_id=False, record_groups=None):
+    if not record_groups:
+        record_groups = models.RecordGroup.get_all_with_no_merge_record(limit=batch_size)
     for record_group in record_groups:
         merged_record = models.MergedRecord.get_by_record_group_id(record_group.id)
         if merged_record:
@@ -124,7 +125,7 @@ def output_record_by_ark(ark_id):
         logging.info("%d: %s" %(record.id, full_fname))
 
             
-def reassign_merged_records(batch_size=1000, from_file=None):
+def reassign_merged_records(from_file, batch_size=1000):
     canonical_ids = []
     if from_file:
         logging.info("assigning ids from file")
