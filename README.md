@@ -69,6 +69,9 @@ Now you are ready to run the code.
             ```
             python snac2/scripts/merge.py -m
             ```
+
+        If the merge record creation process throws an exception about the NOID API being offline, use the -n switch to avoid requesting ARKs live and just create the merge records.  Get a text file of ARKs, one per line, then use the -f switch to fill in the missing canonical IDs.
+
         2. Assemble: this step exports the matched records out to XML files.  It is run as  
 
             ```
