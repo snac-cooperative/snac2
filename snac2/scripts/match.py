@@ -24,7 +24,7 @@ def match_persons_loop(starts_at=None, ends_at=None):
         if not records:
             unprocessed_records = False
         else:
-            match_persons(records, starts_at=starts_at, ends_at=ends_at)
+            match_persons(records)
             logging.info("retrieving next batch...")
 
 def match_corporate_loop():
@@ -246,7 +246,10 @@ def match_exact(record, record_type):
         logging.info("No viaf for %d %s" % (record.id, record.name_norm))
         return None, None, None, 0
         
-    
+
+def viaf_name_exact_validate_check(source_name):
+    return (len(source_name) > 30 or utils.has_n_digits(source_name, n=4))
+
 def match_person_exact(record, in_db_match=True):
     if in_db_match:
         record_group = models.PersonGroup.get_by_name(record.name_norm)
@@ -287,7 +290,7 @@ def match_person_exact(record, in_db_match=True):
             quality_date_to = -1
             if authority_dates:
                 quality_date_from, quality_date_to = check_existence_dates(record, authority_dates)
-                if quality_date_from != 0 and quality_date_to != 0:
+                if quality_date_from != 0 and quality_date_to != 0 and viaf_name_exact_validate_check(record.name_norm):
                     logging.info("Found viaf %s for %d %s" % (viaf_id, record.id, record.name_norm))
                     record_group = models.PersonGroup.get_by_viaf_id(viaf_id)
                     if record_group:

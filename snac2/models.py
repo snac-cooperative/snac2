@@ -748,7 +748,10 @@ class MergedRecord(meta.Base, Entity):
     
     def to_cpf(self):
         logging.info("creating output for %d: %s" % (self.record_group.id, self.canonical_id))
-        combined_record = self.create_combined_record()
+        if self.valid:
+            combined_record = self.create_combined_record()
+        else:
+            combined_record = self.create_tombstone_record()
         #print combined_record
         try:
             doc = xml.dom.minidom.parseString(combined_record)
@@ -785,7 +788,64 @@ class MergedRecord(meta.Base, Entity):
             return doc.toxml().encode('utf-8')
         else:
             return None
-    
+            
+    def create_tombstone_record(self):
+        # quick hack to generate shortened tombstones
+        base = u'''<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="http://socialarchive.iath.virginia.edu/shared/cpf.rng" type="application/xml" schematypens="http://relaxng.org/ns/structure/1.0"?>
+<eac-cpf xmlns="urn:isbn:1-931666-33-4">
+    <control>
+        <recordId> </recordId>
+        <maintenanceStatus>cancelled</maintenanceStatus>
+        <maintenanceAgency>
+            <agencyName>SNAC: Social Networks and Archival Context Project</agencyName>
+        </maintenanceAgency>
+        <maintenanceHistory>
+            <maintenanceEvent>
+                <eventType>cancelled</eventType>
+                <eventDateTime> </eventDateTime>
+                <agentType>machine</agentType>
+                <agent>CPF merge program</agent>
+            </maintenanceEvent>
+        </maintenanceHistory>
+    </control>
+    <cpfDescription>
+        <identity>
+            <entityType> </entityType>
+            <nameEntry><part> </part></nameEntry>
+        </identity>
+    </cpfDescription>
+</eac-cpf>'''
+        doc = xml.dom.minidom.parseString(base)
+        recordIdNode = doc.getElementsByTagName("recordId")[0]
+        recordIdNode.firstChild.replaceWholeText(self.canonical_id)
+        entityTypeNode = doc.getElementsByTagName("entityType")[0]
+        entityTypeNode.firstChild.replaceWholeText(self.r_type)
+        dateTimeNode = doc.getElementsByTagName("eventDateTime")[0]
+        dateTimeNode.firstChild.replaceWholeText(str(datetime.date.today()))
+        partNode = doc.getElementsByTagName("part")[0]
+        if self.record_group.previous_records:
+            partNode.firstChild.replaceWholeText(self.record_group.previous_records[0].name)
+        if not self.valid:
+            if self.invalidated_by:
+                if len(self.invalidated_by) == 1:
+                    otherRecordNode = utils.minidom_create_element(doc, "otherRecordId", attrs={"localType":"http://socialarchive.iath.virginia.edu/control/term#MergedInto"}, text=self.invalidated_by[0].canonical_id)
+                    recordIdNode.parentNode.insertBefore(otherRecordNode, recordIdNode.nextSibling);
+                elif len(self.invalidated_by) > 1:
+                    for record in self.invalidated_by:
+                        otherRecordNode = utils.minidom_create_element(doc, "otherRecordId", attrs={"localType":"http://socialarchive.iath.virginia.edu/control/term#SplitInto"}, text=self.invalidated_by[0].canonical_id)
+                        recordIdNode.parentNode.insertBefore(otherRecordNode, recordIdNode.nextSibling);
+        if self.invalidates:
+            if len(self.invalidates.invalidated_by) == 1:
+                otherRecordNode = utils.minidom_create_element(doc, "otherRecordId", attrs={"localType":"http://socialarchive.iath.virginia.edu/control/term#MergedFrom"}, text=self.invalidated_by[0].canonical_id)
+                recordIdNode.parentNode.insertBefore(otherRecordNode, recordIdNode.nextSibling);
+                #cr.write('<otherRecordId localType="%s">%s</otherRecordId>' % ("http://socialarchive.iath.virginia.edu/control/term#MergedFrom", self.invalidates.canonical_id))
+            elif len(self.invalidated_by) > 1:
+                otherRecordNode = utils.minidom_create_element(doc, "otherRecordId", attrs={"localType":"http://socialarchive.iath.virginia.edu/control/term#SplitFrom"}, text=self.invalidated_by[0].canonical_id)
+                recordIdNode.parentNode.insertBefore(otherRecordNode, recordIdNode.nextSibling);
+                #cr.write('<otherRecordId localType="%s">%s</otherRecordId>' % ("http://socialarchive.iath.virginia.edu/control/term#SplitFrom", self.invalidates.canonical_id))
+        return doc.toxml()
+        
     def create_combined_record(self):
         # drawn from code formerly in merge.py
         # TODO: still need to rewrite this to use a real parser instead of writing out strings.
@@ -1084,7 +1144,7 @@ class MergedRecord(meta.Base, Entity):
         cpf_names = {}
         for k, val in enumerate(mnames):
             cpf_names[k] = val
-        print cpf_names
+        #print cpf_names
         names = merge_name_entries(viaf_info['authForms'], viaf_info['altForms'], cpf_names)
         name_tuples = names.items()
         name_tuples.sort(key=lambda x: x[1].preferenceScore, reverse=True)
@@ -1118,263 +1178,264 @@ class MergedRecord(meta.Base, Entity):
         #END identity   
         cr.write("</identity>")
     
-        #Description
-        cr.write("<description>")
+        if self.valid:
+            #Description
+            cr.write("<description>")
         
-        #Exist Dates
+            #Exist Dates
     
-        existDate = viaf_info['dates']
-        if existDate != None and (existDate[0] !='0' or existDate[1] != '0'):
-            cr.write("<existDates>")
-            cr.write("<dateRange>")
-            if existDate[0] and existDate[0] != '0':
-                term_start = "Birth"
-                if r_type != "person":
-                    term_start = "Active"
-                cr.write("<fromDate standardDate=\"%s\" localType=\"http://socialarchive.iath.virginia.edu/control/term#%s\">" % (snac2.cpf.pad_exist_date(existDate[0]), term_start))
-                cr.write(escape(existDate[0]))
-                cr.write("</fromDate>")
-            if existDate[1] and existDate[1] != '0':
-                term_end = "Death"
-                if r_type != "person":
-                    term_start = "Active"
-                cr.write("<toDate standardDate=\"%s\" localType=\"http://socialarchive.iath.virginia.edu/control/term#%s\">" % (snac2.cpf.pad_exist_date(existDate[1]), term_end))
-                cr.write(escape(existDate[1]))
-                cr.write("</toDate>")
-            cr.write("</dateRange>")
-            cr.write("</existDates>")
-        else:
-            if len(mexistDates) > 0:
-                bestExistDate = mexistDates[0]
-                #for existDate in mexistDates[1:]:
-                #    if (is_better_existence(bestExistDate, existDate)):
-                #        bestExistDate = existDate
-                cr.write(bestExistDate.toxml().encode('utf-8')) 
+            existDate = viaf_info['dates']
+            if existDate != None and (existDate[0] !='0' or existDate[1] != '0'):
+                cr.write("<existDates>")
+                cr.write("<dateRange>")
+                if existDate[0] and existDate[0] != '0':
+                    term_start = "Birth"
+                    if r_type != "person":
+                        term_start = "Active"
+                    cr.write("<fromDate standardDate=\"%s\" localType=\"http://socialarchive.iath.virginia.edu/control/term#%s\">" % (snac2.cpf.pad_exist_date(existDate[0]), term_start))
+                    cr.write(escape(existDate[0]))
+                    cr.write("</fromDate>")
+                if existDate[1] and existDate[1] != '0':
+                    term_end = "Death"
+                    if r_type != "person":
+                        term_start = "Active"
+                    cr.write("<toDate standardDate=\"%s\" localType=\"http://socialarchive.iath.virginia.edu/control/term#%s\">" % (snac2.cpf.pad_exist_date(existDate[1]), term_end))
+                    cr.write(escape(existDate[1]))
+                    cr.write("</toDate>")
+                cr.write("</dateRange>")
+                cr.write("</existDates>")
             else:
-                #logging.info("No exist dates")
-                pass
+                if len(mexistDates) > 0:
+                    bestExistDate = mexistDates[0]
+                    #for existDate in mexistDates[1:]:
+                    #    if (is_better_existence(bestExistDate, existDate)):
+                    #        bestExistDate = existDate
+                    cr.write(bestExistDate.toxml().encode('utf-8')) 
+                else:
+                    #logging.info("No exist dates")
+                    pass
             
-        #Languages used from VIAF - should add script
-        entityLanguages = viaf_info['language']
-        for language in set(entityLanguages):
-            cr.write('<languageUsed>')
-            cr.write('<language languageCode="%s"/>' % escape(language.lower()).encode('utf-8'))
-            cr.write('<script scriptCode="Zyyy"/>')
-            cr.write('</languageUsed>')
+            #Languages used from VIAF - should add script
+            entityLanguages = viaf_info['language']
+            for language in set(entityLanguages):
+                cr.write('<languageUsed>')
+                cr.write('<language languageCode="%s"/>' % escape(language.lower()).encode('utf-8'))
+                cr.write('<script scriptCode="Zyyy"/>')
+                cr.write('</languageUsed>')
         
-        if mlanguages:
-            for language in mlanguages:
-                languageCode = language.getElementsByTagName("language")
-                if languageCode:
-                    languageCode = languageCode[0]
-                    if languageCode.attributes.get("languageCode").value.strip() not in entityLanguages:
-                        entityLanguages.append(languageCode.attributes.get("languageCode").value.strip())
-                        cr.write(language.toxml().encode('utf-8'))
+            if mlanguages:
+                for language in mlanguages:
+                    languageCode = language.getElementsByTagName("language")
+                    if languageCode:
+                        languageCode = languageCode[0]
+                        if languageCode.attributes.get("languageCode").value.strip() not in entityLanguages:
+                            entityLanguages.append(languageCode.attributes.get("languageCode").value.strip())
+                            cr.write(language.toxml().encode('utf-8'))
                         
-        # functions
-        function_terms = {}
-        for function in mfunctions:
-            if function.getElementsByTagName("term"):
-                term = snac2.cpf.extract_subelement_content_from_entry(function, "term")
-                localType = function.attributes.get("localType")
+            # functions
+            function_terms = {}
+            for function in mfunctions:
+                if function.getElementsByTagName("term"):
+                    term = snac2.cpf.extract_subelement_content_from_entry(function, "term")
+                    localType = function.attributes.get("localType")
+                    if localType:
+                        localType = localType.value
+                    if term not in function_terms:
+                        function_terms[term] = (function, localType)
+                    elif function_terms[term][1] != None and not localType:
+                        function_terms[term] = (function, localType)
+                else:
+                    # just passthrough since we're not uniquefying
+                    cr.write(function.toxml().encode('utf-8'))
+            function_terms_items = function_terms.items()
+            for item in function_terms_items:    
+                cr.write(item[1][0].toxml().encode('utf-8'))
+    
+            #Local Descriptions
+            subjects = {}
+            places = {} # placeEntry from <place> tags 
+            desc_places = {} # placeEntry from <localDescription> tags; think this is obsolete
+            misc = []
+    
+            num_and_spaces_re = re.compile(r"^[0-9 -]+$")
+            for localDescription in mlocalDescriptions:
+                localType = localDescription.attributes.get("localType")
                 if localType:
                     localType = localType.value
-                if term not in function_terms:
-                    function_terms[term] = (function, localType)
-                elif function_terms[term][1] != None and not localType:
-                    function_terms[term] = (function, localType)
-            else:
-                # just passthrough since we're not uniquefying
-                cr.write(function.toxml().encode('utf-8'))
-        function_terms_items = function_terms.items()
-        for item in function_terms_items:    
-            cr.write(item[1][0].toxml().encode('utf-8'))
-    
-        #Local Descriptions
-        subjects = {}
-        places = {} # placeEntry from <place> tags 
-        desc_places = {} # placeEntry from <localDescription> tags; think this is obsolete
-        misc = []
-    
-        num_and_spaces_re = re.compile(r"^[0-9 -]+$")
-        for localDescription in mlocalDescriptions:
-            localType = localDescription.attributes.get("localType")
-            if localType:
-                localType = localType.value
-            if localType == "http://socialarchive.iath.virginia.edu/control/term#AssociatedSubject":
-                subject = snac2.cpf.extract_subelement_content_from_entry(localDescription, "term")
-                if num_and_spaces_re.match(subject):
-                    continue
+                if localType == "http://socialarchive.iath.virginia.edu/control/term#AssociatedSubject":
+                    subject = snac2.cpf.extract_subelement_content_from_entry(localDescription, "term")
+                    if num_and_spaces_re.match(subject):
+                        continue
+                    else:
+                        subjects[subject] = subjects.get(subject, 0) + 1
+                elif localType == "http://socialarchive.iath.virginia.edu/control/term#AssociatedPlace":
+                    # TODO: I think this is no longer used after <place> was introduced, but left here for historical reasons -yl
+                    place = snac2.cpf.extract_subelement_content_from_entry(localDescription, "placeEntry")
+                    desc_places[place] = desc_places.get(place, 0) + 1
                 else:
-                    subjects[subject] = subjects.get(subject, 0) + 1
-            elif localType == "http://socialarchive.iath.virginia.edu/control/term#AssociatedPlace":
-            	# TODO: I think this is no longer used after <place> was introduced, but left here for historical reasons -yl
-                place = snac2.cpf.extract_subelement_content_from_entry(localDescription, "placeEntry")
-                desc_places[place] = desc_places.get(place, 0) + 1
-            else:
-                misc.append(localDescription)
-                    #cr.write(localDescription.toxml().encode('utf-8'))
+                    misc.append(localDescription)
+                        #cr.write(localDescription.toxml().encode('utf-8'))
 
-        subjects_list = subjects.items()
-        subjects_list.sort(key=lambda x: x[1], reverse=True)
-        desc_places_list = desc_places.items()
-        desc_places_list.sort(key=lambda x: x[1],  reverse=True)
-        for subject_item in subjects_list:
-            cr.write('<localDescription localType="http://socialarchive.iath.virginia.edu/control/term#AssociatedSubject">')
-            cr.write('<term>%s</term>' % escape(subject_item[0]).encode('utf-8'))
-            cr.write('</localDescription>\n')
-        for place_item in desc_places_list:
-            cr.write('<localDescription localType="http://socialarchive.iath.virginia.edu/control/term#AssociatedPlace">')
-            cr.write('<placeEntry>%s</placeEntry>' % escape(place_item[0]).encode('utf-8'))
-            cr.write('</localDescription>\n')
-        for place in mplaces:
-        	cr.write(place.toxml().encode('utf-8'))
-        	cr.write("\n")
-        for item in misc:
-            cr.write(item.toxml().encode('utf-8'))
+            subjects_list = subjects.items()
+            subjects_list.sort(key=lambda x: x[1], reverse=True)
+            desc_places_list = desc_places.items()
+            desc_places_list.sort(key=lambda x: x[1],  reverse=True)
+            for subject_item in subjects_list:
+                cr.write('<localDescription localType="http://socialarchive.iath.virginia.edu/control/term#AssociatedSubject">')
+                cr.write('<term>%s</term>' % escape(subject_item[0]).encode('utf-8'))
+                cr.write('</localDescription>\n')
+            for place_item in desc_places_list:
+                cr.write('<localDescription localType="http://socialarchive.iath.virginia.edu/control/term#AssociatedPlace">')
+                cr.write('<placeEntry>%s</placeEntry>' % escape(place_item[0]).encode('utf-8'))
+                cr.write('</localDescription>\n')
+            for place in mplaces:
+                cr.write(place.toxml().encode('utf-8'))
+                cr.write("\n")
+            for item in misc:
+                cr.write(item.toxml().encode('utf-8'))
         
-        #Nationality from VIAF
-        entityNationality = viaf_info['nationality']
-        for nationality in set(entityNationality):
-            cr.write('<localDescription localType="http://viaf.org/viaf/terms#nationalityOfEntity">')
-            if not nationality.isupper() or not nationality.isalpha():
-                cr.write('<term>%s</term>' % escape(nationality).encode('utf-8'))
-            else:
-                cr.write('<placeEntry countryCode="%s"/>' % escape(nationality).encode('utf-8'))
-            cr.write('</localDescription>')
-        
-        #Gender from VIAF
-        gender = viaf_info['gender']
-        if gender != None:
-            cr.write('<localDescription localType="http://viaf.org/viaf/terms#gender">')
-            cr.write('<term>%s</term>' %gender)
-            cr.write('</localDescription>')
-        
-        
-        #Occupations
-        if moccupations:
-            occupations_index = set()
-            moccupations = filter(lambda o: snac2.cpf.extract_subelement_content_from_entry(o, "term") not in occupations_index and (occupations_index.add(snac2.cpf.extract_subelement_content_from_entry(o, "term")) or True), moccupations)
-
-        for occupation in moccupations:
-            cr.write(occupation.toxml().encode('utf-8'))
-
-        #BiogHist
-        biogText = {}
-        biogData = []
-        #chronlists = []
-        for biogHist in mbiography:
-            if biogHist.get('citation') and biogHist.get('text'):
-                text = biogHist['text']
-                citation = biogHist['citation']
-                if text in biogText:
-                    biogText[text]['citation'].append(citation)
+            #Nationality from VIAF
+            entityNationality = viaf_info['nationality']
+            for nationality in set(entityNationality):
+                cr.write('<localDescription localType="http://viaf.org/viaf/terms#nationalityOfEntity">')
+                if not nationality.isupper() or not nationality.isalpha():
+                    cr.write('<term>%s</term>' % escape(nationality).encode('utf-8'))
                 else:
-                    biogText[text] = {'text':text, 'citation':[citation]}
-            elif biogHist.get('data'):
-                biogData.append(biogHist['data'])
-        #print mbiography
-        #print biogText
-        if biogText or biogData:
-            cr.write("<biogHist>")
-            for text in biogText.keys():
-                cr.write("%s" % text.encode('utf-8'))
-                for citation in biogText[text]['citation']:
-                    if citation:
-                        cr.write("%s" % citation.encode('utf-8')) # do not escape
-            for data in biogData:
-                cr.write("%s" % data.encode('utf-8'))
-            cr.write("</biogHist>")
-        # 
-#             # de-duplicate
-#             text = biogHist.get('text')
-#             citation = biogHist.get('citation')
-#             if not text:
-#                 # this is a chronList item
-#                 # logging.warning("chronlist unprocessed on %s" %(canonical_id))
-#                 chronlist = biogHist.get("chronlist")
-#                 if chronlist is not None:
-#                     chronlists.append((biogHist["chronlist"], citation))
-#             else:
-#                 concat_text = "\n".join(text)
-#                 if concat_text in biogText:
-#                     biogText[concat_text]['citation'].append(citation)
-#                 else:
-#                     biogText[concat_text] = {'text':text, 'citation':[citation]}
-#         if biogText or chronlists:
-#             cr.write("<biogHist>")
-#             for concat_text in biogText.keys():
-#                 for text in biogText[concat_text]['text']:
-#                     cr.write("%s" % text.encode('utf-8')) # do not escape these otherwise the embedded <p> tags will be lost
-#                 for citation in biogText[concat_text]['citation']:
-#                     if citation:
-#                         cr.write("%s" % citation.encode('utf-8')) # do not escape
-#                     else:
-#                         logging.warning("%i : Citation in biogHist was null, and should not be" % self.canonical_id)
-#             for chronlist_item in chronlists:
-#                 cr.write("%s" % etree.tostring(chronlist_item[0], encoding='utf-8')) # in lxml, the function is tostring
-#                 cr.write("%s" %  chronlist_item[1].encode('utf-8'))
-#             cr.write("</biogHist>")
-#                 #cr.write(biogHist['raw'].encode('utf-8'))
-#                 #print biogHist['raw'].encode('utf-8')
-#                 #cr.write("<biogHist>"+escape(biogHist).encode('utf-8')+"</biogHist>")
-    
-        #END Description
-        cr.write("</description>")
-    
-        #Relations
-        cr.write("<relations>")
-    
-        #CPF Relations
-        for relation in mrelations:
-            #print [(k, relation.attributes[k].value) for k in relation.attributes.keys()]
-            cr.write(relation.toxml().encode('utf-8'))
+                    cr.write('<placeEntry countryCode="%s"/>' % escape(nationality).encode('utf-8'))
+                cr.write('</localDescription>')
         
-        if r_type == "person" or r_type == "corporateBody":
-            r_type_t = r_type.capitalize()
-            headings = viaf_info['mainHeadings']
-            if headings:
-                cr.write('<cpfRelation xlink:type="simple" xlink:href="http://viaf.org/viaf/%s"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#sameAs" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s">' % (viafRecordId, r_type_t)) 
-                cr.write("<relationEntry>%s</relationEntry>" % (escape(headings[0]).encode('utf-8')))
-                cr.write("</cpfRelation>")
-            headingsEl = viaf_info['mainElementEl']
-            if headingsEl:
-                for h in headingsEl:
-                    if h["source"].startswith("LC"):
-                        cr.write('<cpfRelation xlink:type="simple"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#sameAs" xlink:href="http://www.worldcat.org/wcidentities/%s" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s" />' % (h["lccn_wcid"], r_type_t)) 
-                        cr.write('<cpfRelation xlink:type="simple"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#sameAs" xlink:href="http://id.loc.gov/authorities/names/%s" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s" />' % (h["lccn_lcid"], r_type_t)) 
-                    elif h["source"].startswith("WKP"):
-                        cr.write((u'<cpfRelation xlink:type="simple" xlink:href="http://en.wikipedia.org/wiki/%s"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#sameAs"  xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s" />' % (urllib.quote(h["url_id"].encode('utf-8')), r_type_t)).encode('utf-8')) 
-
-        if maybes:
-            for merge_candidate in maybes:
-                #print merge_candidate.record_group.records[0].name.__repr__()
-                if (merge_candidate.canonical_id and merge_candidate.record_group.records and merge_candidate.record_group.records[0].name):
-                    cr.write('<cpfRelation xlink:type="simple"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#mayBeSameAs" xlink:href="%s" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s"><relationEntry>%s</relationEntry></cpfRelation>' % (merge_candidate.canonical_id.encode('utf-8'), r_type_t.encode('utf-8'), escape(merge_candidate.record_group.records[0].name).encode('utf-8'))) 
-                else:
-                    raise ValueError("Problem exporting maybe merge candidate %d: missing canonical_id, name.", merge_candidate.id)
+            #Gender from VIAF
+            gender = viaf_info['gender']
+            if gender != None:
+                cr.write('<localDescription localType="http://viaf.org/viaf/terms#gender">')
+                cr.write('<term>%s</term>' %gender)
+                cr.write('</localDescription>')
         
-        #Resource Relations
-        for resourceRelation in mresourceRelations:
-            cr.write(resourceRelation.toxml().encode('utf-8'))
         
-        #Titles from VIAF
-        for title in viaf_info['titles']:
-            cr.write('<resourceRelation xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#creatorOf" xlink:role="http://socialarchive.iath.virginia.edu/control/term#BibliographicResource" xlink:type="simple">')
-            cr.write('<relationEntry>')
-            title = title.replace("&", "&amp;").replace("<", "&lt;")
-            title = title.replace("\"", "&quot;").replace(">", "&gt;")
-            title = title.replace("\r", "&#xD;").replace("\n", "&#xA;")
-            title = title.replace("\t", "&#x9;")
+            #Occupations
+            if moccupations:
+                occupations_index = set()
+                moccupations = filter(lambda o: snac2.cpf.extract_subelement_content_from_entry(o, "term") not in occupations_index and (occupations_index.add(snac2.cpf.extract_subelement_content_from_entry(o, "term")) or True), moccupations)
+
+            for occupation in moccupations:
+                cr.write(occupation.toxml().encode('utf-8'))
+
+            #BiogHist
+            biogText = {}
+            biogData = []
+            #chronlists = []
+            for biogHist in mbiography:
+                if biogHist.get('citation') and biogHist.get('text'):
+                    text = biogHist['text']
+                    citation = biogHist['citation']
+                    if text in biogText:
+                        biogText[text]['citation'].append(citation)
+                    else:
+                        biogText[text] = {'text':text, 'citation':[citation]}
+                elif biogHist.get('data'):
+                    biogData.append(biogHist['data'])
+            #print mbiography
+            #print biogText
+            if biogText or biogData:
+                cr.write("<biogHist>")
+                for text in biogText.keys():
+                    cr.write("%s" % text.encode('utf-8'))
+                    for citation in biogText[text]['citation']:
+                        if citation:
+                            cr.write("%s" % citation.encode('utf-8')) # do not escape
+                for data in biogData:
+                    cr.write("%s" % data.encode('utf-8'))
+                cr.write("</biogHist>")
+            # 
+    #             # de-duplicate
+    #             text = biogHist.get('text')
+    #             citation = biogHist.get('citation')
+    #             if not text:
+    #                 # this is a chronList item
+    #                 # logging.warning("chronlist unprocessed on %s" %(canonical_id))
+    #                 chronlist = biogHist.get("chronlist")
+    #                 if chronlist is not None:
+    #                     chronlists.append((biogHist["chronlist"], citation))
+    #             else:
+    #                 concat_text = "\n".join(text)
+    #                 if concat_text in biogText:
+    #                     biogText[concat_text]['citation'].append(citation)
+    #                 else:
+    #                     biogText[concat_text] = {'text':text, 'citation':[citation]}
+    #         if biogText or chronlists:
+    #             cr.write("<biogHist>")
+    #             for concat_text in biogText.keys():
+    #                 for text in biogText[concat_text]['text']:
+    #                     cr.write("%s" % text.encode('utf-8')) # do not escape these otherwise the embedded <p> tags will be lost
+    #                 for citation in biogText[concat_text]['citation']:
+    #                     if citation:
+    #                         cr.write("%s" % citation.encode('utf-8')) # do not escape
+    #                     else:
+    #                         logging.warning("%i : Citation in biogHist was null, and should not be" % self.canonical_id)
+    #             for chronlist_item in chronlists:
+    #                 cr.write("%s" % etree.tostring(chronlist_item[0], encoding='utf-8')) # in lxml, the function is tostring
+    #                 cr.write("%s" %  chronlist_item[1].encode('utf-8'))
+    #             cr.write("</biogHist>")
+    #                 #cr.write(biogHist['raw'].encode('utf-8'))
+    #                 #print biogHist['raw'].encode('utf-8')
+    #                 #cr.write("<biogHist>"+escape(biogHist).encode('utf-8')+"</biogHist>")
+    
+            #END Description
+            cr.write("</description>")
+    
+            #Relations
+            cr.write("<relations>")
+    
+            #CPF Relations
+            for relation in mrelations:
+                #print [(k, relation.attributes[k].value) for k in relation.attributes.keys()]
+                cr.write(relation.toxml().encode('utf-8'))
+        
+            if r_type == "person" or r_type == "corporateBody":
+                r_type_t = r_type.capitalize()
+                headings = viaf_info['mainHeadings']
+                if headings:
+                    cr.write('<cpfRelation xlink:type="simple" xlink:href="http://viaf.org/viaf/%s"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#sameAs" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s">' % (viafRecordId, r_type_t)) 
+                    cr.write("<relationEntry>%s</relationEntry>" % (escape(headings[0]).encode('utf-8')))
+                    cr.write("</cpfRelation>")
+                headingsEl = viaf_info['mainElementEl']
+                if headingsEl:
+                    for h in headingsEl:
+                        if h["source"].startswith("LC"):
+                            cr.write('<cpfRelation xlink:type="simple"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#sameAs" xlink:href="http://www.worldcat.org/wcidentities/%s" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s" />' % (h["lccn_wcid"], r_type_t)) 
+                            cr.write('<cpfRelation xlink:type="simple"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#sameAs" xlink:href="http://id.loc.gov/authorities/names/%s" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s" />' % (h["lccn_lcid"], r_type_t)) 
+                        elif h["source"].startswith("WKP"):
+                            cr.write((u'<cpfRelation xlink:type="simple" xlink:href="http://en.wikipedia.org/wiki/%s"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#sameAs"  xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s" />' % (urllib.quote(h["url_id"].encode('utf-8')), r_type_t)).encode('utf-8')) 
+
+            if maybes:
+                for merge_candidate in maybes:
+                    #print merge_candidate.record_group.records[0].name.__repr__()
+                    if (merge_candidate.canonical_id and merge_candidate.record_group.records and merge_candidate.record_group.records[0].name):
+                        cr.write('<cpfRelation xlink:type="simple"  xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#mayBeSameAs" xlink:href="%s" xlink:role="http://socialarchive.iath.virginia.edu/control/term#%s"><relationEntry>%s</relationEntry></cpfRelation>' % (merge_candidate.canonical_id.encode('utf-8'), r_type_t.encode('utf-8'), escape(merge_candidate.record_group.records[0].name).encode('utf-8'))) 
+                    else:
+                        raise ValueError("Problem exporting maybe merge candidate %d: missing canonical_id, name.", merge_candidate.id)
+        
+            #Resource Relations
+            for resourceRelation in mresourceRelations:
+                cr.write(resourceRelation.toxml().encode('utf-8'))
+        
+            #Titles from VIAF
+            for title in viaf_info['titles']:
+                cr.write('<resourceRelation xlink:arcrole="http://socialarchive.iath.virginia.edu/control/term#creatorOf" xlink:role="http://socialarchive.iath.virginia.edu/control/term#BibliographicResource" xlink:type="simple">')
+                cr.write('<relationEntry>')
+                title = title.replace("&", "&amp;").replace("<", "&lt;")
+                title = title.replace("\"", "&quot;").replace(">", "&gt;")
+                title = title.replace("\r", "&#xD;").replace("\n", "&#xA;")
+                title = title.replace("\t", "&#x9;")
 
 
-            cr.write(escape(title).encode('utf-8'))
-            cr.write('</relationEntry>')
-            cr.write('</resourceRelation>')
+                cr.write(escape(title).encode('utf-8'))
+                cr.write('</relationEntry>')
+                cr.write('</resourceRelation>')
 
             
-        #END Relations
-        cr.write("</relations>")   
+            #END Relations
+            cr.write("</relations>")   
     
         #END CPF Description
         cr.write("</cpfDescription>")

@@ -164,7 +164,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output_dir", help="override target directory from config/app.py [not implemented yet]")
     parser.add_argument("-i", "--id", help="only assemble for this specific ARK ID")
-    #parser.add_argument("-c", "--collection", help="assemble for these collection IDs")
+    parser.add_argument("-c", "--collection", help="assemble only for these comma-separated collection IDs")
     parser.add_argument("-s", "--starts_at", help="start the assembly at this position", default=0, type=int)
     parser.add_argument("-e", "--ends_at", help="end the assembly at this position", type=int)
     parser.add_argument("-r", "--real", action="store_true", help="request real ARK IDs; do not use this unless in production mode")
@@ -182,6 +182,9 @@ if __name__ == "__main__":
     elif args.assemble:
         if args.id:
             output_record_by_ark(args.id)
+        elif args.collection:
+            collection_ids = args.collection.split(",")
+            output_updated_records_by_collection_id_loop(collection_ids)
         else:
             logging.info( args.starts_at )
             output_all_records_loop(args.starts_at, batch_size=100, end_at=args.ends_at)

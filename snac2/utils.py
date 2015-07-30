@@ -140,7 +140,7 @@ def strip_accents(s):
     return ''.join((c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn' ))
 
 def has_n_digits(s, n=2):
-    return re.search(r'\d{%d,}' % (n), s) 
+    return True if re.search(r'\d{%d,}' % (n), s) else False
 
 # source from: http://stackoverflow.com/a/93029
 control_chars = ''.join(map(unichr, range(0,32) + range(127,160)))
