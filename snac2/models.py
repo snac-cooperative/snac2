@@ -331,6 +331,12 @@ class OriginalRecord(meta.Base, Entity):
             q = q.options(*options)
         return q.first()
         
+    @classmethod
+    def get_all_collection_ids(cls, session=None):
+        if not session:
+            session = meta.Session
+        return session.query(cls.collection_id.distinct()).order_by(cls.collection_id);
+        
     def name_similar(self, threshold=5, record_groups_only=True, session=None, limit=None, offset=None):
         '''requires the postgres module fuzzystrmatch'''
         if not session:
@@ -899,6 +905,8 @@ class MergedRecord(meta.Base, Entity):
         mlanguages = []
     
         relations_canonical_idx = {}
+        relations_role_and_href_idx = {}
+        
         for cpfRecord in cpfRecords:
             legacyDoc = xml.dom.minidom.parse(cpfRecord)
             try:
@@ -998,11 +1006,18 @@ class MergedRecord(meta.Base, Entity):
                             logging.warning( "Warning %s has no original record" % (extracted_record_id) )
                         relation.removeChild(relation.getElementsByTagName("descriptiveNote")[0])
                     else:
-                        # in this case, we assume there is a xlink:href already, probably external -- pass the relation through without modification
+                        # in this case, we assume there is a xlink:href already, probably external
                         href = relation.attributes.get("xlink:href")
                         if not href:
                             logging.warning("Failed to see a xlink:href in %s and no descriptiveNote either" % (cpfRecord))
-                        
+                        # if there is an href, check whether its role and href are the same.  if so, it needs duplicate-checking
+                        role = relation.attributes.get("xlink:arcrole")
+                        if role:
+                            if relations_role_and_href_idx.get(role.value+"|"+href.value):
+                                seen = True
+                            else:
+                                relations_role_and_href_idx[role.value+"|"+href.value] = 1
+                        # otherwise just passthrough
                     if not seen:
                         filtered_relations.append(relation)
                 mrelations.extend(filtered_relations)
@@ -1314,6 +1329,7 @@ class MergedRecord(meta.Base, Entity):
         
             #Occupations
             if moccupations:
+                #print moccupations
                 occupations_index = set()
                 moccupations = filter(lambda o: snac2.cpf.extract_subelement_content_from_entry(o, "term") not in occupations_index and (occupations_index.add(snac2.cpf.extract_subelement_content_from_entry(o, "term")) or True), moccupations)
 

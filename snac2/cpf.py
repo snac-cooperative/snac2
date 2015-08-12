@@ -122,7 +122,7 @@ def parseOccupations(doc):
         
         occupationsNode = doc.getElementsByTagName("occupations")
         if len(occupationsNode) > 0:
-            return occupationsNode[0].childNodes
+            return occupationsNode[0].getElementsByTagName("occupation")
         else:
             occupationNodes = doc.getElementsByTagName("occupation")
             return occupationNodes
@@ -135,7 +135,7 @@ def parseLocalDescriptions(doc):
 
     localDescNode = doc.getElementsByTagName("localDescriptions")
     if len(localDescNode) > 0:
-        return localDescNode[0].childNodes
+        return localDescNode[0].getElementsByTagName("localDescription")
     else:
         localDescNodes = doc.getElementsByTagName("localDescription")
         return localDescNodes
@@ -167,7 +167,7 @@ def parseSources(doc):
         #doc = xml.dom.minidom.parse(eac)
         sources = doc.getElementsByTagName("sources")
         if len(sources) > 0:
-            return sources[0].childNodes
+            return sources[0].getElementsByTagName("source")
         else:
             source = doc.getElementsByTagName("source")
             if len(source) > 0:
@@ -229,7 +229,8 @@ def parseAssociations(doc):
         return None
 
 def content(tag):
-    return tag.text + ''.join(etree.tostring(e) for e in tag)
+    text = tag.text if tag.text else ""
+    return text + ''.join(etree.tostring(e) for e in tag)
         
 def parseBiogHist2(etree_doc):
     doc = etree_doc
