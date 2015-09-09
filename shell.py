@@ -3,7 +3,6 @@
 import IPython
 import snac2.config.db
 import snac2.config.app as app_config
-#import arkplatform2.models_sql as model
 from snac2.models import *
 import snac2.viaf as viaf
 import sys

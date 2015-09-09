@@ -536,7 +536,7 @@ class MergedRecord(meta.Base, Entity):
     updated_at = Column(DateTime(), nullable=False, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, index=True)
     invalid_reason = Column(types.UnicodeText, nullable=True)
     invalidates = orm.relationship("MergedRecord", backref=orm.backref("invalidated_by"), foreign_keys=[invalidates_record_id], remote_side=[id], uselist=False)
-    
+    #invalidated_by_record_id = Column(types.BigInteger, ForeignKey('merged_records.id', onupdate="CASCADE", ondelete="SET NULL"), nullable=True, index=True )
     #last_output_at = Column(DateTime(), nullable=True, index=True)
 
     __mapper_args__ = {
@@ -1010,13 +1010,14 @@ class MergedRecord(meta.Base, Entity):
                         href = relation.attributes.get("xlink:href")
                         if not href:
                             logging.warning("Failed to see a xlink:href in %s and no descriptiveNote either" % (cpfRecord))
-                        # if there is an href, check whether its role and href are the same.  if so, it needs duplicate-checking
-                        role = relation.attributes.get("xlink:arcrole")
-                        if role:
-                            if relations_role_and_href_idx.get(role.value+"|"+href.value):
-                                seen = True
-                            else:
-                                relations_role_and_href_idx[role.value+"|"+href.value] = 1
+                        else:
+                            # if there is an href, check whether its role and href are the same.  if so, it needs duplicate-checking
+                            role = relation.attributes.get("xlink:arcrole")
+                            if role:
+                                if relations_role_and_href_idx.get(role.value+"|"+href.value):
+                                    seen = True
+                                else:
+                                    relations_role_and_href_idx[role.value+"|"+href.value] = 1
                         # otherwise just passthrough
                     if not seen:
                         filtered_relations.append(relation)
