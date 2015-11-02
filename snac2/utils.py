@@ -46,7 +46,7 @@ class NameEntry(object):
     def __repr__(self):
         return "<NameEntry %s, %s, %s>" % (self.name.encode('utf-8'), " ".join(self.sources), self.n_type)
     
-    def __init__(self, name, sources, n_type):
+    def __init__(self, name, sources, n_type, lang=None, script_code=None, use_dates=None):
         super(object, self)
         self.name = name
         self.name_norm = name_entry_normalize(self.name)
@@ -54,6 +54,10 @@ class NameEntry(object):
         if sources:
             self.sources = sources
         self.n_type = n_type
+        self.lang = lang
+        self.script_code = script_code
+        self.use_dates = use_dates
+        
         
         
 class MergedNameEntry(object):
@@ -61,12 +65,15 @@ class MergedNameEntry(object):
     def __repr__(self):
         return "<MergedNameEntry %s, %s>" % (self.name.encode('utf-8'), self.sources)
         
-    def __init__(self, name, name_norm, sources):
+    def __init__(self, name, name_norm, sources, lang=None, script_code=None, use_dates=None):
         self.name = name
         self.name_norm = name_norm
         self.sources = {}
         if sources:
            self.sources = sources
+        self.lang = lang
+        self.script_code = script_code
+        self.use_dates = use_dates
     
     def merge(self, name_entry, name_origin=""):
         if len(name_entry.name) > self.name:

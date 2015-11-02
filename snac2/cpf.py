@@ -45,7 +45,14 @@ def parseIdentity(doc):
             sources = set(sources)
             if not identityInformation.get('name'):
                 identityInformation['name'] = entityName #common.normalizeName(entityName)
-            identityInformation['name_entries'].append(utils.NameEntry(name=entityName, sources=sources, n_type=n_type))
+            use_dates = nameEntry.getElementsByTagName("useDates")
+            lang = nameEntry.attributes.get("xml:lang")
+            if lang:
+                lang = lang.value
+            script_code = nameEntry.attributes.get("scriptCode")
+            if script_code:
+                script_code = script_code.value
+            identityInformation['name_entries'].append(utils.NameEntry(name=entityName, sources=sources, n_type=n_type, use_dates=use_dates, lang=lang, script_code=script_code))
         #Parse Entity type
         entityType = identity[0].getElementsByTagName("entityType")
         entityType = entityType[0].childNodes[0].nodeValue
@@ -264,7 +271,32 @@ def parseFunctions(doc):
         return functions
     else:
         return []
+        
 
+def parseDescriptions(doc):
+    results = []
+    cpfDescription = doc.getElementsByTagName("cpfDescription")
+    if len(cpfDescription) > 0:
+        cpfDescription = cpfDescription[0]
+        description = cpfDescription.getElementsByTagName("description")
+        if len(description) > 0:
+            description = description[0]
+            generalContext = description.getElementsByTagName("generalContext")
+            legalStatus = description.getElementsByTagName("legalStatus")
+            mandate = description.getElementsByTagName("mandate")
+            structureOrGenealogy = description.getElementsByTagName("structureOrGenealogy")
+            result = {"legalStatus":legalStatus, "generalContext":generalContext, "mandate":mandate, "structureOrGenealogy":structureOrGenealogy}
+            result = dict((k,v) for k,v in result.iteritems() if v is not None)
+            if result:
+                results.append(result)
+    return results
+            
+def parseEntityId(doc):
+    cpfDescription = doc.getElementsByTagName("cpfDescription")
+    if len(cpfDescription)> 0:
+        entityId = cpfDescription[0].getElementsByTagName("entityId")
+        if entityId:
+            return entityId[0]
 
 def pad_exist_date(date_string):
     if not date_string:

@@ -903,6 +903,10 @@ class MergedRecord(meta.Base, Entity):
         mplaces = []
         
         mlanguages = []
+        
+        mdescriptionmisc = []
+        
+        mentityids = []
     
         relations_canonical_idx = {}
         relations_role_and_href_idx = {}
@@ -930,6 +934,9 @@ class MergedRecord(meta.Base, Entity):
                 if type != None:
                     mtypes.append(type)
             
+            entityId = snac2.cpf.parseEntityId(legacyDoc)
+            if entityId != None:
+                mentityids.append(entityId)
         
             sources = snac2.cpf.parseSources(legacyDoc)
             if sources != None:
@@ -957,6 +964,10 @@ class MergedRecord(meta.Base, Entity):
             functions = snac2.cpf.parseFunctions(legacyDoc)
             if functions:
                 mfunctions.extend(functions)
+            
+            descriptions = snac2.cpf.parseDescriptions(legacyDoc)
+            if descriptions:
+                mdescriptionmisc.extend(descriptions)
         
             relations = snac2.cpf.parseAssociationsRaw(legacyDoc)
             if relations != None:
@@ -1004,7 +1015,14 @@ class MergedRecord(meta.Base, Entity):
                                     logging.warning( "record not valid" )
                         else:
                             logging.warning( "Warning %s has no original record" % (extracted_record_id) )
-                        relation.removeChild(relation.getElementsByTagName("descriptiveNote")[0])
+                        desc = relation.getElementsByTagName("descriptiveNote")
+                        if desc:
+                            desc = desc[0]
+                            spans = desc.getElementsByTagName("span")
+                            for span in spans:
+                                if (span.attributes.get("localType") and span.attributes.get("localType") == "snac:extractRecordId"):
+                                    relation.removeChild(desc)
+                        # relation.removeChild(relation.getElementsByTagName("descriptiveNote")[0])
                     else:
                         # in this case, we assume there is a xlink:href already, probably external
                         href = relation.attributes.get("xlink:href")
@@ -1110,38 +1128,39 @@ class MergedRecord(meta.Base, Entity):
             cr.write("""<maintenanceHistory>
                         <maintenanceEvent>
                         <eventType>revised</eventType>
-                        <eventDateTime>%s</eventDateTime> 
+                        <eventDateTime standardDateTime=\"%s\">%s</eventDateTime> 
                         <agentType>machine</agentType>
                         <agent>CPF merge program</agent>
                         <eventDescription>Merge v2.0</eventDescription>
                         </maintenanceEvent>
-                        </maintenanceHistory>""" % datetime.date.today())
+                        </maintenanceHistory>""" % (datetime.datetime.today().isoformat(), datetime.datetime.today()))
         else:
             cr.write("""<maintenanceHistory>
              <maintenanceEvent>
             <eventType>cancelled</eventType>
-            <eventDateTime>%s</eventDateTime> 
+            <eventDateTime standardDateTime=\"%s\">%s</eventDateTime> 
             <agentType>machine</agentType>
             <agent>CPF merge program</agent>
             <eventDescription>%s</eventDescription>
             </maintenanceEvent>
-            </maintenanceHistory>""" % (datetime.date.today(), self.invalid_reason if self.invalid_reason else ""))
+            </maintenanceHistory>""" % (datetime.datetime.today().isoformat(), datetime.datetime.today(), self.invalid_reason if self.invalid_reason else ""))
         
         #Sources
-        cr.write("<sources>")
-        for source in msources:
-            if source:
-                # NOTE: if the code blows up here with:
-                # data = data.replace("&", "&amp;").replace("<", "&lt;")
-                # AttributeError: 'NoneType' object has no attribute 'replace'
-                # there is a bug in Python 2.6's minidom (of course there is. why are we using it again?). See http://bugs.python.org/issue5762.  Upgrade to Python 2.7 or monkeypatch it.
-                cr.write(source.toxml(encoding='utf-8')) # NOTE: if the code blows up here, see http://bugs.python.org/issue5762
+        if msources:
+            cr.write("<sources>")
+            for source in msources:
+                if source:
+                    # NOTE: if the code blows up here with:
+                    # data = data.replace("&", "&amp;").replace("<", "&lt;")
+                    # AttributeError: 'NoneType' object has no attribute 'replace'
+                    # there is a bug in Python 2.6's minidom (of course there is. why are we using it again?). See http://bugs.python.org/issue5762.  Upgrade to Python 2.7 or monkeypatch it.
+                    cr.write(source.toxml(encoding='utf-8')) 
 
-        #VIAF
-        if viafRecordId != None:
-            cr.write('<source xlink:type="simple" xlink:href="http://viaf.org/viaf/%s"/>' %viafRecordId)
+            #VIAF
+            if viafRecordId != None:
+                cr.write('<source xlink:type="simple" xlink:href="http://viaf.org/viaf/%s"/>' %viafRecordId)
     
-        cr.write("</sources>")
+            cr.write("</sources>")
     
         #END control
         cr.write("</control>")
@@ -1155,7 +1174,10 @@ class MergedRecord(meta.Base, Entity):
         #Type
         for type in set(mtypes):
             cr.write("<entityType>%s</entityType>" %type)
-    
+        
+        for entityId in mentityids:
+            cr.write(entityId.toxml().encode('utf-8'))
+            
         #Name
         cpf_names = {}
         for k, val in enumerate(mnames):
@@ -1166,7 +1188,11 @@ class MergedRecord(meta.Base, Entity):
         name_tuples.sort(key=lambda x: x[1].preferenceScore, reverse=True)
         authorized_sources = set(["lc", "lac", "nla", 'oac'])
         for name_tuple in name_tuples:
-            cr.write('<nameEntry snac:preferenceScore="%s">' % (str(name_tuple[1].preferenceScore).zfill(2)))
+            cr.write('<nameEntry snac:preferenceScore="%s"%s%s>' % (str(name_tuple[1].preferenceScore).zfill(2),
+                                                                      ' xml:lang=\"' + name_tuple[1].lang + '\"'   if name_tuple[1].lang else "",
+                                                                      ' scriptCode=\"' + name_tuple[1].script_code + '\"'   if name_tuple[1].script_code else "",
+                                                                )
+                    )
             cr.write('<part>')
             cr.write(escape(name_tuple[1].name).encode('utf-8'))
             cr.write('</part>\n')
@@ -1189,6 +1215,9 @@ class MergedRecord(meta.Base, Entity):
                         cr.write('<alternativeForm>')
                         cr.write(source["source"])
                         cr.write('</alternativeForm>\n')
+            if name_tuple[1].use_dates:
+                use_date = name_tuple[1].use_dates[0]
+                cr.write(use_date.toxml().encode('utf-8'))
             cr.write('</nameEntry>\n')
         
         #END identity   
@@ -1363,40 +1392,13 @@ class MergedRecord(meta.Base, Entity):
                 for data in biogData:
                     cr.write("%s" % data.encode('utf-8'))
                 cr.write("</biogHist>")
-            # 
-    #             # de-duplicate
-    #             text = biogHist.get('text')
-    #             citation = biogHist.get('citation')
-    #             if not text:
-    #                 # this is a chronList item
-    #                 # logging.warning("chronlist unprocessed on %s" %(canonical_id))
-    #                 chronlist = biogHist.get("chronlist")
-    #                 if chronlist is not None:
-    #                     chronlists.append((biogHist["chronlist"], citation))
-    #             else:
-    #                 concat_text = "\n".join(text)
-    #                 if concat_text in biogText:
-    #                     biogText[concat_text]['citation'].append(citation)
-    #                 else:
-    #                     biogText[concat_text] = {'text':text, 'citation':[citation]}
-    #         if biogText or chronlists:
-    #             cr.write("<biogHist>")
-    #             for concat_text in biogText.keys():
-    #                 for text in biogText[concat_text]['text']:
-    #                     cr.write("%s" % text.encode('utf-8')) # do not escape these otherwise the embedded <p> tags will be lost
-    #                 for citation in biogText[concat_text]['citation']:
-    #                     if citation:
-    #                         cr.write("%s" % citation.encode('utf-8')) # do not escape
-    #                     else:
-    #                         logging.warning("%i : Citation in biogHist was null, and should not be" % self.canonical_id)
-    #             for chronlist_item in chronlists:
-    #                 cr.write("%s" % etree.tostring(chronlist_item[0], encoding='utf-8')) # in lxml, the function is tostring
-    #                 cr.write("%s" %  chronlist_item[1].encode('utf-8'))
-    #             cr.write("</biogHist>")
-    #                 #cr.write(biogHist['raw'].encode('utf-8'))
-    #                 #print biogHist['raw'].encode('utf-8')
-    #                 #cr.write("<biogHist>"+escape(biogHist).encode('utf-8')+"</biogHist>")
-    
+            
+            if mdescriptionmisc:
+                for description in mdescriptionmisc:
+                    for k in description.keys():
+                        for v in description[k]:
+                            cr.write(v.toxml().encode('utf-8'))
+                
             #END Description
             cr.write("</description>")
     
@@ -1536,7 +1538,7 @@ def merge_name_entries(viaf_auths, viaf_alts, cpf_identities):
             if name_norm in merged_names:
                 merged_names[name_norm].merge(name_entry, name_origin=name_origin)
             else:
-                merged_names[name_norm] = utils.MergedNameEntry(name=name_entry.name, name_norm=name_norm, sources={})
+                merged_names[name_norm] = utils.MergedNameEntry(name=name_entry.name, name_norm=name_norm, sources={}, lang=name_entry.lang, script_code=name_entry.script_code, use_dates=name_entry.use_dates)
                 merged_names[name_norm].merge_sources(name_entry, name_origin=name_origin)
     return merged_names
     
